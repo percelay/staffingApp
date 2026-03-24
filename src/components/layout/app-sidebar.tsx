@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: 'Timeline', href: '/timeline', icon: '▦' },
   { label: 'Graph', href: '/graph', icon: '◉' },
   { label: 'Staffing', href: '/staffing', icon: '⊞' },
+  { label: 'People', href: '/manage', icon: '◎' },
 ];
 
 export function AppSidebar() {
