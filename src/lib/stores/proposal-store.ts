@@ -13,35 +13,55 @@ interface ProposalStore {
   engagementId: string | null;
   slots: ProposalSlot[];
   savedProposals: Proposal[];
+
   setEngagementId: (id: string | null) => void;
   addToSlot: (slotIndex: number, consultantId: string) => void;
   removeFromSlot: (slotIndex: number) => void;
   resetSlots: () => void;
-  saveProposal: (proposal: Proposal) => void;
+  saveProposal: (proposal: Proposal) => Promise<void>;
+  fetchProposals: () => Promise<void>;
 }
 
 export const useProposalStore = create<ProposalStore>((set) => ({
   engagementId: null,
   slots: [...DEFAULT_SLOTS],
   savedProposals: [],
+
   setEngagementId: (engagementId) =>
     set({ engagementId, slots: DEFAULT_SLOTS.map((s) => ({ ...s })) }),
+
   addToSlot: (slotIndex, consultantId) =>
     set((state) => ({
       slots: state.slots.map((s, i) =>
         i === slotIndex ? { ...s, consultant_id: consultantId } : s
       ),
     })),
+
   removeFromSlot: (slotIndex) =>
     set((state) => ({
       slots: state.slots.map((s, i) =>
         i === slotIndex ? { ...s, consultant_id: null } : s
       ),
     })),
+
   resetSlots: () =>
     set({ slots: DEFAULT_SLOTS.map((s) => ({ ...s })) }),
-  saveProposal: (proposal) =>
+
+  saveProposal: async (proposal) => {
+    const res = await fetch('/api/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(proposal),
+    });
+    const saved = await res.json();
     set((state) => ({
-      savedProposals: [...state.savedProposals, proposal],
-    })),
+      savedProposals: [...state.savedProposals, saved],
+    }));
+  },
+
+  fetchProposals: async () => {
+    const res = await fetch('/api/proposals');
+    const data = await res.json();
+    set({ savedProposals: data });
+  },
 }));

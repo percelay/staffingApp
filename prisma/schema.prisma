@@ -1,0 +1,249 @@
+// StaffingHub Database Schema
+// PostgreSQL + Prisma ORM
+// Normalized, production-ready schema for consulting staffing management
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum SeniorityLevel {
+  analyst
+  consultant
+  manager
+  senior_manager
+  partner
+}
+
+enum PracticeArea {
+  strategy
+  operations
+  digital
+  risk
+  people
+}
+
+enum ConsultantStatus {
+  active
+  on_leave
+  departed
+}
+
+enum EngagementStatus {
+  active
+  upcoming
+  completed
+  at_risk
+}
+
+enum AssignmentRole {
+  lead
+  manager
+  consultant
+  analyst
+}
+
+enum SignalType {
+  overwork
+  weekend_work
+  no_break
+  high_travel
+}
+
+enum Severity {
+  low
+  medium
+  high
+}
+
+// ─────────────────────────────────────────────
+// Skill (normalized — single source of truth)
+// ─────────────────────────────────────────────
+
+model Skill {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  consultants      ConsultantSkill[]
+  engagementSkills EngagementSkill[]
+
+  @@map("skills")
+}
+
+// ─────────────────────────────────────────────
+// Consultant
+// ─────────────────────────────────────────────
+
+model Consultant {
+  id             String           @id @default(cuid())
+  name           String
+  role           String
+  practiceArea   PracticeArea     @map("practice_area")
+  seniorityLevel SeniorityLevel   @map("seniority_level")
+  avatarUrl      String           @map("avatar_url")
+  status         ConsultantStatus @default(active)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  skills           ConsultantSkill[]
+  assignments      Assignment[]
+  wellbeingSignals WellbeingSignal[]
+
+  @@index([practiceArea])
+  @@index([seniorityLevel])
+  @@index([status])
+  @@map("consultants")
+}
+
+// ─────────────────────────────────────────────
+// Consultant <-> Skill (many-to-many)
+// ─────────────────────────────────────────────
+
+model ConsultantSkill {
+  consultantId String @map("consultant_id")
+  skillId      String @map("skill_id")
+
+  consultant Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([consultantId, skillId])
+  @@map("consultant_skills")
+}
+
+// ─────────────────────────────────────────────
+// Engagement (project)
+// ─────────────────────────────────────────────
+
+model Engagement {
+  id          String           @id @default(cuid())
+  clientName  String           @map("client_name")
+  projectName String           @map("project_name")
+  startDate   DateTime         @map("start_date") @db.Date
+  endDate     DateTime         @map("end_date") @db.Date
+  status      EngagementStatus @default(upcoming)
+  color       String           @default("#4F46E5")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  requiredSkills EngagementSkill[]
+  assignments    Assignment[]
+  proposals      Proposal[]
+
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("engagements")
+}
+
+// ─────────────────────────────────────────────
+// Engagement <-> Skill (many-to-many)
+// ─────────────────────────────────────────────
+
+model EngagementSkill {
+  engagementId String @map("engagement_id")
+  skillId      String @map("skill_id")
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([engagementId, skillId])
+  @@map("engagement_skills")
+}
+
+// ─────────────────────────────────────────────
+// Assignment (consultant <-> engagement link)
+//
+// allocation_percentage is the KEY field:
+//   100 = full-time on this project
+//    80 = four out of five days
+//    20 = one out of five days
+//
+// Utilization = SUM(allocation_percentage) across
+// all active assignments for a consultant in a period.
+// It is COMPUTED, never stored.
+// ─────────────────────────────────────────────
+
+model Assignment {
+  id                   String         @id @default(cuid())
+  consultantId         String         @map("consultant_id")
+  engagementId         String         @map("engagement_id")
+  role                 AssignmentRole
+  startDate            DateTime       @map("start_date") @db.Date
+  endDate              DateTime       @map("end_date") @db.Date
+  allocationPercentage Int            @map("allocation_percentage") @default(100)
+  notes                String?
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  consultant Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+
+  @@index([consultantId])
+  @@index([engagementId])
+  @@index([consultantId, startDate, endDate])
+  @@index([engagementId, startDate, endDate])
+  @@map("assignments")
+}
+
+// ─────────────────────────────────────────────
+// Wellbeing Signal
+// ─────────────────────────────────────────────
+
+model WellbeingSignal {
+  id           String     @id @default(cuid())
+  consultantId String     @map("consultant_id")
+  signalType   SignalType @map("signal_type")
+  severity     Severity
+  notes        String?
+  recordedAt   DateTime   @map("recorded_at") @db.Date
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  consultant Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+
+  @@index([consultantId])
+  @@index([consultantId, recordedAt])
+  @@map("wellbeing_signals")
+}
+
+// ─────────────────────────────────────────────
+// Proposal + Slots
+// ─────────────────────────────────────────────
+
+model Proposal {
+  id           String   @id @default(cuid())
+  engagementId String   @map("engagement_id")
+  fitScore     Float    @map("fit_score")
+  burnoutRisk  Float    @map("burnout_risk")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  engagement Engagement     @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  slots      ProposalSlot[]
+
+  @@index([engagementId])
+  @@map("proposals")
+}
+
+model ProposalSlot {
+  id           String         @id @default(cuid())
+  proposalId   String         @map("proposal_id")
+  role         AssignmentRole
+  consultantId String?        @map("consultant_id")
+  required     Boolean        @default(true)
+  sortOrder    Int            @default(0) @map("sort_order")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@map("proposal_slots")
+}
