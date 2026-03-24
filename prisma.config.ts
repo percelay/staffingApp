@@ -7,7 +7,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   engine: "classic",
-  // datasource URL is read from schema.prisma's env("DATABASE_URL")
-  // We don't use env() here to avoid crashes when DATABASE_URL
-  // isn't available during postinstall on Vercel.
+  datasource: {
+    // Use process.env directly with a dummy fallback so prisma generate
+    // doesn't crash when DATABASE_URL isn't set (e.g. during Vercel postinstall).
+    url: process.env.DATABASE_URL ?? "postgresql://placeholder:placeholder@localhost:5432/placeholder",
+  },
 });
