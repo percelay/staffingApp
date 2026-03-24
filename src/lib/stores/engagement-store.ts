@@ -50,30 +50,54 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
     ),
 
   addEngagement: async (data) => {
-    const res = await fetch('/api/engagements', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const created = await res.json();
-    set((s) => ({ engagements: [...s.engagements, created] }));
-    return created;
+    try {
+      const res = await fetch('/api/engagements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        set((s) => ({ engagements: [...s.engagements, created] }));
+        return created;
+      }
+    } catch {
+      // API unavailable — fall through to local-only creation
+    }
+    // Fallback: add to local store without DB persistence
+    const local: Engagement = { ...data, id: crypto.randomUUID() };
+    set((s) => ({ engagements: [...s.engagements, local] }));
+    return local;
   },
 
   updateEngagement: async (id, data) => {
-    const res = await fetch(`/api/engagements/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const updated = await res.json();
+    try {
+      const res = await fetch(`/api/engagements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        set((s) => ({
+          engagements: s.engagements.map((e) => (e.id === id ? updated : e)),
+        }));
+        return;
+      }
+    } catch {
+      // API unavailable — fall through to local-only update
+    }
     set((s) => ({
-      engagements: s.engagements.map((e) => (e.id === id ? updated : e)),
+      engagements: s.engagements.map((e) => (e.id === id ? { ...e, ...data } as Engagement : e)),
     }));
   },
 
   removeEngagement: async (id) => {
-    await fetch(`/api/engagements/${id}`, { method: 'DELETE' });
+    try {
+      await fetch(`/api/engagements/${id}`, { method: 'DELETE' });
+    } catch {
+      // API unavailable — still remove locally
+    }
     set((s) => ({
       engagements: s.engagements.filter((e) => e.id !== id),
     }));
