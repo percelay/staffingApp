@@ -84,11 +84,18 @@ export function SwimLaneChart() {
 
   const groups = groupAndSortConsultants(consultants, practiceAreaFilter);
 
+  const assignedEngagementIds = new Set(assignments.map((a) => a.engagement_id));
+  const unassignedEngagements = engagements.filter((e) => !assignedEngagementIds.has(e.id));
+
   // Calculate total height
   let totalHeight = 0;
   for (const group of groups) {
     totalHeight += GROUP_HEADER_HEIGHT;
     totalHeight += group.consultants.length * LANE_HEIGHT;
+  }
+  if (unassignedEngagements.length > 0) {
+    totalHeight += GROUP_HEADER_HEIGHT;
+    totalHeight += unassignedEngagements.length * LANE_HEIGHT;
   }
 
   const { start, end } = get12WeekWindow(weekOffset);
@@ -110,7 +117,8 @@ export function SwimLaneChart() {
 
   // D3 rendering
   useEffect(() => {
-    if (!svgRef.current || consultants.length === 0) return;
+    if (!svgRef.current) return;
+    if (consultants.length === 0 && unassignedEngagements.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -362,10 +370,88 @@ export function SwimLaneChart() {
         currentY += LANE_HEIGHT;
       }
     }
+
+    // Unassigned Projects section
+    if (unassignedEngagements.length > 0) {
+      currentY += GROUP_HEADER_HEIGHT;
+
+      for (const engagement of unassignedEngagements) {
+        const laneY = currentY;
+
+        svg
+          .append('line')
+          .attr('x1', 0)
+          .attr('y1', laneY + LANE_HEIGHT)
+          .attr('x2', chartWidth)
+          .attr('y2', laneY + LANE_HEIGHT)
+          .attr('stroke', '#f1f5f9')
+          .attr('stroke-width', 1);
+
+        const blockStart = parseISO(engagement.start_date);
+        const blockEnd = parseISO(engagement.end_date);
+
+        if (!(blockEnd < start || blockStart > end)) {
+          const x = Math.max(0, xScale(blockStart));
+          const x2 = Math.min(chartWidth, xScale(blockEnd));
+          const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
+          const blockGroup = svg.append('g').attr('class', 'engagement-block');
+
+          blockGroup
+            .append('rect')
+            .attr('x', x + 2)
+            .attr('y', laneY + BLOCK_PADDING)
+            .attr('width', width - 4)
+            .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2)
+            .attr('rx', 6)
+            .attr('ry', 6)
+            .attr('fill', engagement.color)
+            .attr('opacity', 0.7)
+            .attr('cursor', 'pointer')
+            .attr('filter', 'url(#block-shadow)')
+            .on('mouseenter', function () {
+              d3.select(this).transition().duration(150)
+                .attr('opacity', 0.9)
+                .attr('y', laneY + BLOCK_PADDING - 1)
+                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2 + 2);
+            })
+            .on('mouseleave', function () {
+              d3.select(this).transition().duration(150)
+                .attr('opacity', 0.7)
+                .attr('y', laneY + BLOCK_PADDING)
+                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2);
+            })
+            .on('click', () => {
+              setSelectedEngagement(engagement.id);
+              setDrawerOpen(true);
+            });
+
+          if (width > 60) {
+            const label =
+              width > 140
+                ? `${engagement.client_name} — ${engagement.project_name}`
+                : engagement.client_name;
+
+            blockGroup
+              .append('text')
+              .attr('x', x + 10)
+              .attr('y', laneY + LANE_HEIGHT / 2 + 1)
+              .attr('dy', '0.35em')
+              .attr('fill', 'white')
+              .attr('font-size', '11px')
+              .attr('font-weight', '500')
+              .attr('pointer-events', 'none')
+              .text(label);
+          }
+        }
+
+        currentY += LANE_HEIGHT;
+      }
+    }
   }, [
     consultants,
     engagements,
     assignments,
+    unassignedEngagements,
     signals,
     weekOffset,
     chartWidth,
@@ -495,6 +581,37 @@ export function SwimLaneChart() {
 
               return items;
             })}
+          {unassignedEngagements.length > 0 && (
+            <>
+              <div
+                className="flex items-center px-4 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-slate-50 border-b"
+                style={{ height: GROUP_HEADER_HEIGHT }}
+              >
+                Unassigned
+              </div>
+              {unassignedEngagements.map((engagement) => (
+                <div
+                  key={engagement.id}
+                  className="flex items-center gap-3 px-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                  style={{ height: LANE_HEIGHT }}
+                  onClick={() => { setSelectedEngagement(engagement.id); setDrawerOpen(true); }}
+                >
+                  <div
+                    className="h-3 w-3 rounded-sm shrink-0"
+                    style={{ backgroundColor: engagement.color }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate leading-tight">
+                      {engagement.client_name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {engagement.project_name}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
           </div>
 
           {/* SVG chart */}
