@@ -14,19 +14,33 @@ import { getWeeklyAllocations } from '@/lib/utils/availability';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { SENIORITY_ORDER, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant } from '@/lib/types/consultant';
+import type { Assignment } from '@/lib/types/assignment';
 import { Button } from '@/components/ui/button';
 
-const LANE_HEIGHT = 64;
+const BASE_LANE_HEIGHT = 64;
 const HEADER_WIDTH = 220;
 const GROUP_HEADER_HEIGHT = 36;
 const TOP_AXIS_HEIGHT = 48;
 const BLOCK_PADDING = 6;
 const MIN_BLOCK_WIDTH = 20;
+const BASE_BLOCK_HEIGHT = BASE_LANE_HEIGHT - BLOCK_PADDING * 2;
 
 interface ConsultantGroup {
   practiceArea: string;
   label: string;
   consultants: Consultant[];
+}
+
+interface AssignmentLayout {
+  clippedStart: Date;
+  clippedEnd: Date;
+  height: number;
+  yOffset: number;
+}
+
+interface ConsultantLaneLayout {
+  height: number;
+  assignmentLayouts: Map<string, AssignmentLayout>;
 }
 
 function groupAndSortConsultants(
@@ -63,6 +77,124 @@ function groupAndSortConsultants(
   return result;
 }
 
+function buildConsultantLaneLayout(
+  consultantAssignments: Assignment[],
+  viewStart: Date,
+  viewEnd: Date
+): ConsultantLaneLayout {
+  const visibleAssignments = consultantAssignments
+    .map((assignment) => {
+      const assignmentStart = parseISO(assignment.start_date);
+      const assignmentEnd = parseISO(assignment.end_date);
+
+      if (assignmentEnd < viewStart || assignmentStart > viewEnd) {
+        return null;
+      }
+
+      return {
+        assignment,
+        clippedStart:
+          assignmentStart > viewStart ? assignmentStart : viewStart,
+        clippedEnd: assignmentEnd < viewEnd ? assignmentEnd : viewEnd,
+        height: (assignment.allocation_percentage / 100) * BASE_BLOCK_HEIGHT,
+      };
+    })
+    .filter((assignment): assignment is NonNullable<typeof assignment> => Boolean(assignment))
+    .sort((a, b) => {
+      const startDiff = a.clippedStart.getTime() - b.clippedStart.getTime();
+      if (startDiff !== 0) return startDiff;
+
+      const heightDiff = b.height - a.height;
+      if (heightDiff !== 0) return heightDiff;
+
+      return a.clippedEnd.getTime() - b.clippedEnd.getTime();
+    });
+
+  const assignmentLayouts = new Map<string, AssignmentLayout>();
+  let activeAssignments: Array<{
+    clippedEnd: number;
+    height: number;
+    yOffset: number;
+  }> = [];
+  let maxContentHeight = BASE_BLOCK_HEIGHT;
+
+  // Pack visible assignments into the lowest available vertical slot so overlaps stack.
+  for (const visibleAssignment of visibleAssignments) {
+    const assignmentStart = visibleAssignment.clippedStart.getTime();
+    activeAssignments = activeAssignments
+      .filter((placement) => placement.clippedEnd > assignmentStart)
+      .sort((a, b) => a.yOffset - b.yOffset);
+
+    let yOffset = 0;
+    for (const placement of activeAssignments) {
+      if (yOffset + visibleAssignment.height <= placement.yOffset) {
+        break;
+      }
+      yOffset = placement.yOffset + placement.height;
+    }
+
+    assignmentLayouts.set(visibleAssignment.assignment.id, {
+      clippedStart: visibleAssignment.clippedStart,
+      clippedEnd: visibleAssignment.clippedEnd,
+      height: visibleAssignment.height,
+      yOffset,
+    });
+
+    activeAssignments.push({
+      clippedEnd: visibleAssignment.clippedEnd.getTime(),
+      height: visibleAssignment.height,
+      yOffset,
+    });
+
+    maxContentHeight = Math.max(
+      maxContentHeight,
+      yOffset + visibleAssignment.height
+    );
+  }
+
+  return {
+    height: maxContentHeight + BLOCK_PADDING * 2,
+    assignmentLayouts,
+  };
+}
+
+function groupAssignmentsByConsultant(assignments: Assignment[]) {
+  const assignmentsByConsultant = new Map<string, Assignment[]>();
+
+  for (const assignment of assignments) {
+    const consultantAssignments =
+      assignmentsByConsultant.get(assignment.consultant_id) || [];
+    consultantAssignments.push(assignment);
+    assignmentsByConsultant.set(assignment.consultant_id, consultantAssignments);
+  }
+
+  return assignmentsByConsultant;
+}
+
+function buildConsultantLaneLayouts(
+  groups: ConsultantGroup[],
+  assignmentsByConsultant: Map<string, Assignment[]>,
+  viewStart: Date,
+  viewEnd: Date
+) {
+  const consultantLaneLayouts = new Map<string, ConsultantLaneLayout>();
+
+  for (const group of groups) {
+    for (const consultant of group.consultants) {
+      consultantLaneLayouts.set(
+        consultant.id,
+        buildConsultantLaneLayout(
+          assignmentsByConsultant.get(consultant.id) || [],
+          viewStart,
+          viewEnd
+        )
+      );
+    }
+  }
+
+  return consultantLaneLayouts;
+}
+
 export function SwimLaneChart() {
   const svgRef = useRef<SVGSVGElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -86,21 +218,32 @@ export function SwimLaneChart() {
 
   const assignedEngagementIds = new Set(assignments.map((a) => a.engagement_id));
   const unassignedEngagements = engagements.filter((e) => !assignedEngagementIds.has(e.id));
+  const { start, end } = get12WeekWindow(weekOffset);
+  const weeks = getWeeksBetween(start, end);
+  const chartWidth = Math.max(containerWidth - HEADER_WIDTH, weeks.length * 80);
+  const assignmentsByConsultant = groupAssignmentsByConsultant(assignments);
+  const consultantLaneLayouts = buildConsultantLaneLayouts(
+    groups,
+    assignmentsByConsultant,
+    start,
+    end
+  );
 
   // Calculate total height
   let totalHeight = 0;
   for (const group of groups) {
     totalHeight += GROUP_HEADER_HEIGHT;
-    totalHeight += group.consultants.length * LANE_HEIGHT;
+    totalHeight += group.consultants.reduce((height, consultant) => {
+      return (
+        height +
+        (consultantLaneLayouts.get(consultant.id)?.height || BASE_LANE_HEIGHT)
+      );
+    }, 0);
   }
   if (unassignedEngagements.length > 0) {
     totalHeight += GROUP_HEADER_HEIGHT;
-    totalHeight += unassignedEngagements.length * LANE_HEIGHT;
+    totalHeight += unassignedEngagements.length * BASE_LANE_HEIGHT;
   }
-
-  const { start, end } = get12WeekWindow(weekOffset);
-  const weeks = getWeeksBetween(start, end);
-  const chartWidth = Math.max(containerWidth - HEADER_WIDTH, weeks.length * 80);
 
   // Resize observer
   useEffect(() => {
@@ -122,6 +265,13 @@ export function SwimLaneChart() {
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+    const effectAssignmentsByConsultant = groupAssignmentsByConsultant(assignments);
+    const effectConsultantLaneLayouts = buildConsultantLaneLayouts(
+      groups,
+      effectAssignmentsByConsultant,
+      start,
+      end
+    );
 
     const xScale = d3
       .scaleTime()
@@ -178,6 +328,12 @@ export function SwimLaneChart() {
 
       for (const consultant of group.consultants) {
         const laneY = currentY;
+        const laneLayout =
+          effectConsultantLaneLayouts.get(consultant.id) || {
+            height: BASE_LANE_HEIGHT,
+            assignmentLayouts: new Map<string, AssignmentLayout>(),
+          };
+        const laneHeight = laneLayout.height;
 
         // Burnout heat wash
         const burnoutScore = calculateBurnoutRisk(
@@ -193,7 +349,7 @@ export function SwimLaneChart() {
             .attr('x', 0)
             .attr('y', laneY)
             .attr('width', chartWidth)
-            .attr('height', LANE_HEIGHT)
+            .attr('height', laneHeight)
             .attr('fill', `rgba(239, 68, 68, ${baseIntensity})`)
             .attr('pointer-events', 'none');
 
@@ -217,7 +373,7 @@ export function SwimLaneChart() {
                 .attr('x', weekX)
                 .attr('y', laneY)
                 .attr('width', weekWidth)
-                .attr('height', LANE_HEIGHT)
+                .attr('height', laneHeight)
                 .attr('fill', `rgba(239, 68, 68, ${weekIntensity})`)
                 .attr('pointer-events', 'none');
             }
@@ -240,7 +396,7 @@ export function SwimLaneChart() {
               .attr('x', weekX)
               .attr('y', laneY)
               .attr('width', weekWidth)
-              .attr('height', LANE_HEIGHT)
+              .attr('height', laneHeight)
               .attr('fill', 'rgba(34, 197, 94, 0.08)')
               .attr('class', 'animate-glow-green')
               .attr('pointer-events', 'none');
@@ -251,16 +407,15 @@ export function SwimLaneChart() {
         svg
           .append('line')
           .attr('x1', 0)
-          .attr('y1', laneY + LANE_HEIGHT)
+          .attr('y1', laneY + laneHeight)
           .attr('x2', chartWidth)
-          .attr('y2', laneY + LANE_HEIGHT)
+          .attr('y2', laneY + laneHeight)
           .attr('stroke', '#f1f5f9')
           .attr('stroke-width', 1);
 
         // Engagement blocks for this consultant
-        const consultantAssignments = assignments.filter(
-          (a) => a.consultant_id === consultant.id
-        );
+        const consultantAssignments =
+          effectAssignmentsByConsultant.get(consultant.id) || [];
 
         for (const assignment of consultantAssignments) {
           const engagement = engagements.find(
@@ -268,30 +423,25 @@ export function SwimLaneChart() {
           );
           if (!engagement) continue;
 
-          const blockStart = parseISO(assignment.start_date);
-          const blockEnd = parseISO(assignment.end_date);
+          const assignmentLayout = laneLayout.assignmentLayouts.get(assignment.id);
+          if (!assignmentLayout) continue;
 
-          // Skip if entirely outside the view
-          if (blockEnd < start || blockStart > end) continue;
-
-          const x = Math.max(0, xScale(blockStart));
-          const x2 = Math.min(chartWidth, xScale(blockEnd));
+          const x = Math.max(0, xScale(assignmentLayout.clippedStart));
+          const x2 = Math.min(chartWidth, xScale(assignmentLayout.clippedEnd));
           const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
+          const blockY = laneY + BLOCK_PADDING + assignmentLayout.yOffset;
+          const blockHeight = assignmentLayout.height;
 
           const blockGroup = svg.append('g').attr('class', 'engagement-block');
 
-          // Block rectangle
-          const opacity =
-            assignment.allocation_percentage < 100
-              ? 0.5 + (assignment.allocation_percentage / 100) * 0.5
-              : 1;
+          const opacity = 0.92;
 
           blockGroup
             .append('rect')
             .attr('x', x + 2)
-            .attr('y', laneY + BLOCK_PADDING)
+            .attr('y', blockY)
             .attr('width', width - 4)
-            .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2)
+            .attr('height', blockHeight)
             .attr('rx', 6)
             .attr('ry', 6)
             .attr('fill', engagement.color)
@@ -302,17 +452,16 @@ export function SwimLaneChart() {
               d3.select(this)
                 .transition()
                 .duration(150)
-                .attr('opacity', Math.min(1, opacity + 0.15))
-                .attr('y', laneY + BLOCK_PADDING - 1)
-                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2 + 2);
+                .attr('opacity', Math.min(1, opacity + 0.08))
+                .attr('stroke', 'rgba(255,255,255,0.85)')
+                .attr('stroke-width', 1.5);
             })
             .on('mouseleave', function () {
               d3.select(this)
                 .transition()
                 .duration(150)
                 .attr('opacity', opacity)
-                .attr('y', laneY + BLOCK_PADDING)
-                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2);
+                .attr('stroke-width', 0);
             })
             .on('click', () => {
               setSelectedEngagement(engagement.id);
@@ -320,7 +469,7 @@ export function SwimLaneChart() {
             });
 
           // Text label
-          if (width > 60) {
+          if (width > 60 && blockHeight >= 18) {
             const label =
               width > 140
                 ? `${engagement.client_name} — ${engagement.project_name}`
@@ -329,7 +478,7 @@ export function SwimLaneChart() {
             blockGroup
               .append('text')
               .attr('x', x + 10)
-              .attr('y', laneY + LANE_HEIGHT / 2 + 1)
+              .attr('y', blockY + blockHeight / 2 + 1)
               .attr('dy', '0.35em')
               .attr('fill', 'white')
               .attr('font-size', '11px')
@@ -353,11 +502,15 @@ export function SwimLaneChart() {
           }
 
           // Allocation badge for partial assignments
-          if (assignment.allocation_percentage < 100 && width > 40) {
+          if (
+            assignment.allocation_percentage < 100 &&
+            width > 40 &&
+            blockHeight >= 12
+          ) {
             blockGroup
               .append('text')
               .attr('x', x + width - 8)
-              .attr('y', laneY + BLOCK_PADDING + 12)
+              .attr('y', blockY + 12)
               .attr('text-anchor', 'end')
               .attr('fill', 'rgba(255,255,255,0.8)')
               .attr('font-size', '9px')
@@ -367,7 +520,7 @@ export function SwimLaneChart() {
           }
         }
 
-        currentY += LANE_HEIGHT;
+        currentY += laneHeight;
       }
     }
 
@@ -381,9 +534,9 @@ export function SwimLaneChart() {
         svg
           .append('line')
           .attr('x1', 0)
-          .attr('y1', laneY + LANE_HEIGHT)
+          .attr('y1', laneY + BASE_LANE_HEIGHT)
           .attr('x2', chartWidth)
-          .attr('y2', laneY + LANE_HEIGHT)
+          .attr('y2', laneY + BASE_LANE_HEIGHT)
           .attr('stroke', '#f1f5f9')
           .attr('stroke-width', 1);
 
@@ -401,7 +554,7 @@ export function SwimLaneChart() {
             .attr('x', x + 2)
             .attr('y', laneY + BLOCK_PADDING)
             .attr('width', width - 4)
-            .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2)
+            .attr('height', BASE_BLOCK_HEIGHT)
             .attr('rx', 6)
             .attr('ry', 6)
             .attr('fill', engagement.color)
@@ -412,13 +565,13 @@ export function SwimLaneChart() {
               d3.select(this).transition().duration(150)
                 .attr('opacity', 0.9)
                 .attr('y', laneY + BLOCK_PADDING - 1)
-                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2 + 2);
+                .attr('height', BASE_BLOCK_HEIGHT + 2);
             })
             .on('mouseleave', function () {
               d3.select(this).transition().duration(150)
                 .attr('opacity', 0.7)
                 .attr('y', laneY + BLOCK_PADDING)
-                .attr('height', LANE_HEIGHT - BLOCK_PADDING * 2);
+                .attr('height', BASE_BLOCK_HEIGHT);
             })
             .on('click', () => {
               setSelectedEngagement(engagement.id);
@@ -434,7 +587,7 @@ export function SwimLaneChart() {
             blockGroup
               .append('text')
               .attr('x', x + 10)
-              .attr('y', laneY + LANE_HEIGHT / 2 + 1)
+              .attr('y', laneY + BASE_LANE_HEIGHT / 2 + 1)
               .attr('dy', '0.35em')
               .attr('fill', 'white')
               .attr('font-size', '11px')
@@ -444,7 +597,7 @@ export function SwimLaneChart() {
           }
         }
 
-        currentY += LANE_HEIGHT;
+        currentY += BASE_LANE_HEIGHT;
       }
     }
   }, [
@@ -557,7 +710,11 @@ export function SwimLaneChart() {
                   <div
                     key={consultant.id}
                     className="flex items-center gap-3 px-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
-                    style={{ height: LANE_HEIGHT }}
+                    style={{
+                      height:
+                        consultantLaneLayouts.get(consultant.id)?.height ||
+                        BASE_LANE_HEIGHT,
+                    }}
                   >
                     <img
                       src={consultant.avatar_url}
@@ -593,7 +750,7 @@ export function SwimLaneChart() {
                 <div
                   key={engagement.id}
                   className="flex items-center gap-3 px-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
-                  style={{ height: LANE_HEIGHT }}
+                  style={{ height: BASE_LANE_HEIGHT }}
                   onClick={() => { setSelectedEngagement(engagement.id); setDrawerOpen(true); }}
                 >
                   <div
