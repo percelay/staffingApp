@@ -32,7 +32,7 @@ export default function DashboardLayout({
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h1 className="text-sm font-semibold tracking-tight">StaffingHub</h1>
         </header>
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
           {children}
         </main>
       </SidebarInset>

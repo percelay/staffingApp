@@ -94,7 +94,7 @@ export function StaffingWorkspace() {
   }, [engagements, statusFilter, searchQuery]);
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden min-h-0">
       {/* ── LEFT: Engagement List ── */}
       <div className="w-[340px] flex flex-col border-r bg-white overflow-hidden">
         <div className="p-4 border-b space-y-3">
@@ -131,7 +131,7 @@ export function StaffingWorkspace() {
           </Select>
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-2 space-y-1">
             {filteredEngagements.map((eng) => {
               const teamCount = assignments.filter((a) => a.engagement_id === eng.id).length;
@@ -182,7 +182,7 @@ export function StaffingWorkspace() {
       </div>
 
       {/* ── RIGHT: Selected Engagement Detail ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/30">
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/30 min-h-0">
         {selectedEngagement ? (
           <EngagementDetail
             engagement={selectedEngagement}
@@ -326,7 +326,7 @@ function EngagementDetail({
   };
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 min-h-0">
       <div className="p-6 max-w-3xl space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
