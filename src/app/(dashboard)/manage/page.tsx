@@ -10,10 +10,9 @@ import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import { getCurrentConsultantUtilization, isAssignmentActiveOnDate } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getWeeklyAllocations } from '@/lib/utils/availability';
 import { getStatusColor } from '@/lib/utils/colors';
-import { get12WeekWindow } from '@/lib/utils/date-helpers';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { PracticeArea, SeniorityLevel } from '@/lib/types/consultant';
 import type { EngagementStatus } from '@/lib/types/engagement';
@@ -75,19 +74,19 @@ export default function ManagePage() {
       );
     }
 
-    const { start, end } = get12WeekWindow(0);
+    const now = new Date();
 
     return list.map((c) => {
       const burnout = calculateBurnoutRisk(c.id, assignments, signals);
-      const weeklyAllocs = getWeeklyAllocations(c.id, assignments, start, end);
-      const avgUtil =
-        weeklyAllocs.length > 0
-          ? Math.round(
-              weeklyAllocs.reduce((sum, w) => sum + w.allocation, 0) / weeklyAllocs.length
-            )
-          : 0;
-      const assignmentCount = assignments.filter((a) => a.consultant_id === c.id).length;
-      return { consultant: c, burnout, avgUtil, assignmentCount };
+      const currentUtilization = getCurrentConsultantUtilization(
+        c.id,
+        assignments,
+        now
+      );
+      const assignmentCount = assignments.filter(
+        (a) => a.consultant_id === c.id && isAssignmentActiveOnDate(a, now)
+      ).length;
+      return { consultant: c, burnout, currentUtilization, assignmentCount };
     }).sort((a, b) => {
       const seniorityOrder: Record<string, number> = { partner: 5, senior_manager: 4, manager: 3, consultant: 2, analyst: 1 };
       return (seniorityOrder[b.consultant.seniority_level] ?? 0) - (seniorityOrder[a.consultant.seniority_level] ?? 0);
@@ -187,7 +186,7 @@ export default function ManagePage() {
           <div className="grid gap-2">
             {tab === 'people' ? (
               <>
-                {enrichedConsultants.map(({ consultant, burnout, avgUtil, assignmentCount }) => {
+                {enrichedConsultants.map(({ consultant, burnout, currentUtilization, assignmentCount }) => {
                   const statusColor = getStatusColor(burnout);
                   return (
                     <button
@@ -216,7 +215,7 @@ export default function ManagePage() {
                             {consultant.skills.length} skills
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {assignmentCount} project{assignmentCount !== 1 ? 's' : ''}
+                            {assignmentCount} current project{assignmentCount !== 1 ? 's' : ''}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {consultant.skills.slice(0, 3).join(', ')}
@@ -228,11 +227,15 @@ export default function ManagePage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className={`text-sm font-bold ${
-                            avgUtil > 100 ? 'text-red-500' : avgUtil > 80 ? 'text-amber-500' : 'text-green-500'
+                            currentUtilization > 100
+                              ? 'text-red-500'
+                              : currentUtilization > 80
+                              ? 'text-amber-500'
+                              : 'text-green-500'
                           }`}>
-                            {avgUtil}%
+                            {currentUtilization}%
                           </p>
-                          <p className="text-[10px] text-muted-foreground">Utilization</p>
+                          <p className="text-[10px] text-muted-foreground">Current UR</p>
                         </div>
                       </div>
                     </button>

@@ -17,6 +17,11 @@ import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
 import { useProposalStore } from '@/lib/stores/proposal-store';
+import {
+  formatAllocationAsManDays,
+  formatManDaysPerWeek,
+  getEngagementManDaysPerWeek,
+} from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/colors';
 import { SENIORITY_LABELS } from '@/lib/types/consultant';
@@ -62,6 +67,10 @@ export function EngagementDrawer() {
   const duration = differenceInWeeks(
     parseISO(engagement.end_date),
     parseISO(engagement.start_date)
+  );
+  const projectManDaysPerWeek = getEngagementManDaysPerWeek(
+    engagement.id,
+    assignmentsByEngagement
   );
 
   const teamMembers = assignmentsByEngagement.map((a) => {
@@ -122,6 +131,13 @@ export function EngagementDrawer() {
             </p>
           </div>
 
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Weekly Effort
+            </p>
+            <p className="text-sm">{formatManDaysPerWeek(projectManDaysPerWeek)}</p>
+          </div>
+
           {/* Required skills */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -171,7 +187,11 @@ export function EngagementDrawer() {
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {SENIORITY_LABELS[consultant.seniority_level]} ·{' '}
-                        {assignment.role} · {assignment.allocation_percentage}%
+                        {assignment.role} ·{' '}
+                        {formatAllocationAsManDays(
+                          assignment.allocation_percentage,
+                          'compact'
+                        )}
                       </p>
                     </div>
                     {statusLabel !== 'healthy' && (

@@ -9,6 +9,7 @@ import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
 import { useUIStore } from '@/lib/stores/ui-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { formatManDaysPerWeek, getEngagementManDaysPerWeek } from '@/lib/utils/allocation';
 import { get12WeekWindow, getWeeksBetween, getWeekLabel } from '@/lib/utils/date-helpers';
 import { getWeeklyAllocations } from '@/lib/utils/availability';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
@@ -272,6 +273,13 @@ export function SwimLaneChart() {
       start,
       end
     );
+    const engagementManDaysById = new Map<string, number>();
+    for (const engagement of engagements) {
+      engagementManDaysById.set(
+        engagement.id,
+        getEngagementManDaysPerWeek(engagement.id, assignments)
+      );
+    }
 
     const xScale = d3
       .scaleTime()
@@ -501,12 +509,8 @@ export function SwimLaneChart() {
               });
           }
 
-          // Allocation badge for partial assignments
-          if (
-            assignment.allocation_percentage < 100 &&
-            width > 40 &&
-            blockHeight >= 12
-          ) {
+          // Project effort badge
+          if (width > 72 && blockHeight >= 12) {
             blockGroup
               .append('text')
               .attr('x', x + width - 8)
@@ -516,7 +520,12 @@ export function SwimLaneChart() {
               .attr('font-size', '9px')
               .attr('font-weight', '600')
               .attr('pointer-events', 'none')
-              .text(`${assignment.allocation_percentage}%`);
+              .text(
+                formatManDaysPerWeek(
+                  engagementManDaysById.get(engagement.id) || 0,
+                  'compact'
+                )
+              );
           }
         }
 

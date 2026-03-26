@@ -11,6 +11,7 @@ import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import { formatAllocationAsManDays } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor, getSenioritySize } from '@/lib/utils/colors';
 import { SENIORITY_LABELS } from '@/lib/types/consultant';
@@ -398,7 +399,11 @@ export default function ForceGraphView() {
                   <div className="min-w-0">
                     <p className="text-sm truncate">{t.consultant.name}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {t.role} · {t.allocation_percentage}%
+                      {t.role} ·{' '}
+                      {formatAllocationAsManDays(
+                        t.allocation_percentage,
+                        'compact'
+                      )}
                     </p>
                   </div>
                 </div>
@@ -473,7 +478,11 @@ export default function ForceGraphView() {
                       {me.engagement.client_name}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
-                      {me.role} · {me.allocation_percentage}%
+                      {me.role} ·{' '}
+                      {formatAllocationAsManDays(
+                        me.allocation_percentage,
+                        'compact'
+                      )}
                     </p>
                   </div>
                 </div>

@@ -11,8 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
-import { getWeeklyAllocations } from '@/lib/utils/availability';
-import { get12WeekWindow } from '@/lib/utils/date-helpers';
+import {
+  formatAllocationAsManDays,
+  getCurrentConsultantUtilization,
+  isAssignmentActiveOnDate,
+} from '@/lib/utils/allocation';
 import {
   SENIORITY_LABELS,
   PRACTICE_AREA_LABELS,
@@ -65,14 +68,15 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
 
   if (!consultant) return null;
 
-  // Compute utilization
-  const consultantAssignments = assignments.filter((a) => a.consultant_id === consultant.id);
-  const { start, end } = get12WeekWindow(0);
-  const weeklyAllocs = getWeeklyAllocations(consultant.id, assignments, start, end);
-  const avgUtilization =
-    weeklyAllocs.length > 0
-      ? Math.round(weeklyAllocs.reduce((sum, w) => sum + w.allocation, 0) / weeklyAllocs.length)
-      : 0;
+  const now = new Date();
+  const consultantAssignments = assignments.filter(
+    (a) => a.consultant_id === consultant.id && isAssignmentActiveOnDate(a, now)
+  );
+  const currentUtilization = getCurrentConsultantUtilization(
+    consultant.id,
+    assignments,
+    now
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -146,18 +150,18 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
               <span className="text-sm font-medium">Current Utilization</span>
               <span
                 className={`text-2xl font-bold ${
-                  avgUtilization > 100
+                  currentUtilization > 100
                     ? 'text-red-500'
-                    : avgUtilization > 80
+                    : currentUtilization > 80
                     ? 'text-amber-500'
                     : 'text-green-500'
                 }`}
               >
-                {avgUtilization}%
+                {currentUtilization}%
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across {consultantAssignments.length} active assignment{consultantAssignments.length !== 1 ? 's' : ''} (12-week avg)
+              Sum of {consultantAssignments.length} current project assignment{consultantAssignments.length !== 1 ? 's' : ''}
             </p>
           </div>
 
@@ -246,9 +250,9 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
 
           {/* Active Assignments */}
           <div className="space-y-3">
-            <Label>Active Assignments</Label>
+            <Label>Current Assignments</Label>
             {consultantAssignments.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">Not assigned to any projects</p>
+              <p className="text-sm text-muted-foreground italic">Not assigned to any current projects</p>
             ) : (
               <div className="space-y-2">
                 {consultantAssignments.map((assignment) => {
@@ -270,7 +274,10 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
                       </div>
                       <div className="text-right">
                         <Badge variant="secondary" className="text-xs">
-                          {assignment.allocation_percentage}%
+                          {formatAllocationAsManDays(
+                            assignment.allocation_percentage,
+                            'compact'
+                          )}
                         </Badge>
                         <p className="text-xs text-muted-foreground mt-0.5 capitalize">
                           {assignment.role}

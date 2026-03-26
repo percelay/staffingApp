@@ -14,10 +14,13 @@ import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import {
+  formatAllocationAsManDays,
+  getCurrentConsultantUtilization,
+} from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
+import { getAverageAvailability } from '@/lib/utils/availability';
 import { getStatusColor } from '@/lib/utils/colors';
-import { get12WeekWindow } from '@/lib/utils/date-helpers';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
 import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
@@ -439,7 +442,9 @@ function EngagementDetail({
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Team ({engAssignments.length})</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Total allocation: {totalAllocation}%</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Team effort: {formatAllocationAsManDays(totalAllocation)}
+              </p>
             </div>
             <Button size="sm" variant="outline" onClick={() => setAddingMember(!addingMember)}>
               {addingMember ? 'Cancel' : '+ Add Consultant'}
@@ -515,14 +520,15 @@ function EngagementDetail({
                 if (!consultant) return null;
                 const burnout = calculateBurnoutRisk(consultant.id, allAssignments, signals);
                 const statusColor = getStatusColor(burnout);
-                const { start, end } = get12WeekWindow(0);
-                const weeklyAllocs = getWeeklyAllocations(consultant.id, allAssignments, start, end);
-                const avgUtil = weeklyAllocs.length > 0 ? Math.round(weeklyAllocs.reduce((sum, w) => sum + w.allocation, 0) / weeklyAllocs.length) : 0;
+                const currentUtilization = getCurrentConsultantUtilization(
+                  consultant.id,
+                  allAssignments
+                );
                 return (
                   <TeamMemberCard key={assignment.id} assignmentId={assignment.id}
                     consultantName={consultant.name} consultantRole={consultant.role} avatarUrl={consultant.avatar_url}
                     assignmentRole={assignment.role} allocation={assignment.allocation_percentage}
-                    totalUtilization={avgUtil} statusColor={statusColor} burnout={burnout}
+                    totalUtilization={currentUtilization} statusColor={statusColor} burnout={burnout}
                     skills={consultant.skills} engagementSkills={engagement.required_skills}
                     onUpdateAllocation={(id, pct) => onUpdateAssignment(id, { allocation_percentage: pct })}
                     onUpdateRole={(id, role) => onUpdateAssignment(id, { role })}
@@ -591,12 +597,12 @@ function TeamMemberCard({ assignmentId, consultantName, consultantRole, avatarUr
           ) : (
             <button className="h-7 w-full rounded-md border text-xs font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-1"
               onClick={() => { setLocalAlloc(allocation); setEditingAlloc(true); }}>
-              {allocation}% <span className="text-muted-foreground">({(allocation / 20).toFixed(1)}d/wk)</span>
+              {allocation}% <span className="text-muted-foreground">({formatAllocationAsManDays(allocation, 'compact')})</span>
             </button>
           )}
         </div>
         <div className="space-y-1">
-          <Label className="text-[10px] text-muted-foreground">Total UR</Label>
+          <Label className="text-[10px] text-muted-foreground">Current UR</Label>
           <div className={`h-7 rounded-md border flex items-center justify-center text-xs font-bold ${
             totalUtilization > 100 ? 'bg-red-50 text-red-700 border-red-200'
               : totalUtilization > 80 ? 'bg-amber-50 text-amber-700 border-amber-200'
