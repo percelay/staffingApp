@@ -41,19 +41,24 @@ export async function GET(request: Request) {
  * across all active assignments for a consultant.
  */
 export async function POST(request: Request) {
-  const body = await request.json();
+  try {
+    const body = await request.json();
 
-  const assignment = await prisma.assignment.create({
-    data: {
-      consultantId: body.consultant_id,
-      engagementId: body.engagement_id,
-      role: body.role,
-      startDate: new Date(body.start_date),
-      endDate: new Date(body.end_date),
-      allocationPercentage: body.allocation_percentage ?? 100,
-      notes: body.notes || null,
-    },
-  });
+    const assignment = await prisma.assignment.create({
+      data: {
+        consultantId: body.consultant_id,
+        engagementId: body.engagement_id,
+        role: body.role,
+        startDate: new Date(body.start_date),
+        endDate: new Date(body.end_date),
+        allocationPercentage: body.allocation_percentage ?? 100,
+        notes: body.notes || null,
+      },
+    });
 
-  return Response.json(toAssignmentDTO(assignment), { status: 201 });
+    return Response.json(toAssignmentDTO(assignment), { status: 201 });
+  } catch (err) {
+    console.error('[POST /api/assignments]', err);
+    return Response.json({ error: 'Failed to create assignment' }, { status: 500 });
+  }
 }
