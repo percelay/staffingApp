@@ -465,27 +465,45 @@ function EngagementDetail({
                   </SelectContent>
                 </Select>
               </div>
-              <Select value={newConsultantId} onValueChange={(v) => setNewConsultantId(v ?? '')}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select a consultant..." /></SelectTrigger>
-                <SelectContent>
-                  {availableConsultants.map((c) => {
-                    const burnout = calculateBurnoutRisk(c.id, allAssignments, signals);
-                    const utilization = getAverageAvailability(c.id, allAssignments, parseISO(engagement.start_date), parseISO(engagement.end_date));
+              <div className="max-h-[320px] overflow-y-auto border rounded-md">
+                {availableConsultants.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No consultants available</p>
+                ) : (
+                  availableConsultants.map((c) => {
+                    const isSelected = newConsultantId === c.id;
                     const skillMatch = engagement.required_skills.filter((s) => c.skills.includes(s));
                     return (
-                      <SelectItem key={c.id} value={c.id}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getStatusColor(burnout) }} />
-                          <span>{c.name}</span>
-                          <span className="text-muted-foreground text-xs">({SENIORITY_LABELS[c.seniority_level as keyof typeof SENIORITY_LABELS]})</span>
-                          <span className="text-muted-foreground text-xs">{Math.round(utilization)}% avail</span>
-                          {skillMatch.length > 0 && <span className="text-green-600 text-xs">{skillMatch.length} skill{skillMatch.length > 1 ? 's' : ''}</span>}
+                      <button
+                        key={c.id}
+                        onClick={() => setNewConsultantId(isSelected ? '' : c.id)}
+                        className={`w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors ${
+                          isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">{c.name}</span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {SENIORITY_LABELS[c.seniority_level as keyof typeof SENIORITY_LABELS]}
+                            </span>
+                            {skillMatch.length > 0 && (
+                              <span className="text-[10px] text-green-600 font-medium shrink-0">
+                                {skillMatch.length}/{engagement.required_skills.length}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </SelectItem>
+                        <AvailabilityBar
+                          consultantId={c.id}
+                          allAssignments={allAssignments}
+                          engStart={engagement.start_date}
+                          engEnd={engagement.end_date}
+                        />
+                      </button>
                     );
-                  })}
-                </SelectContent>
-              </Select>
+                  })
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Role</Label>
@@ -617,6 +635,78 @@ function TeamMemberCard({ assignmentId, consultantName, consultantRole, avatarUr
         {matchedSkills.length > 0 && <span className="text-[10px] text-green-600 font-medium">{matchedSkills.length}/{engagementSkills.length} skills match</span>}
         {burnout >= 60 && <Badge variant="secondary" className="text-[9px] bg-red-100 text-red-700">Burnout risk {Math.round(burnout)}</Badge>}
       </div>
+    </div>
+  );
+}
+
+// ─── Availability Bar ────────────────────────────────────────────────────────
+
+function AvailabilityBar({
+  consultantId,
+  allAssignments,
+  engStart,
+  engEnd,
+}: {
+  consultantId: string;
+  allAssignments: Assignment[];
+  engStart: string;
+  engEnd: string;
+}) {
+  const weeks = useMemo(() => {
+    const start = parseISO(engStart);
+    const end = parseISO(engEnd);
+    return getWeeklyAllocations(consultantId, allAssignments, start, end);
+  }, [consultantId, allAssignments, engStart, engEnd]);
+
+  if (weeks.length === 0) return null;
+
+  // Group consecutive weeks with same status to reduce DOM nodes
+  type Segment = { status: 'free' | 'partial' | 'full'; span: number; available: number };
+  const segments: Segment[] = [];
+  for (const w of weeks) {
+    const available = Math.max(0, 100 - w.allocation);
+    const status = w.allocation >= 100 ? 'full' : w.allocation > 0 ? 'partial' : 'free';
+    const last = segments[segments.length - 1];
+    if (last && last.status === status && (status !== 'partial' || last.available === available)) {
+      last.span++;
+    } else {
+      segments.push({ status, span: 1, available });
+    }
+  }
+
+  const totalWeeks = weeks.length;
+
+  return (
+    <div className="flex h-[6px] w-full rounded-full overflow-hidden bg-slate-100 gap-px">
+      {segments.map((seg, i) => {
+        const widthPct = (seg.span / totalWeeks) * 100;
+        const bg =
+          seg.status === 'full'
+            ? 'bg-red-400'
+            : seg.status === 'partial'
+              ? 'bg-amber-400'
+              : 'bg-emerald-400';
+        return (
+          <div
+            key={i}
+            className={`relative ${bg} group`}
+            style={{ width: `${widthPct}%` }}
+            title={
+              seg.status === 'full'
+                ? 'Fully booked'
+                : seg.status === 'partial'
+                  ? `${seg.available}% available`
+                  : 'Available'
+            }
+          >
+            {seg.status === 'partial' && widthPct > 15 && (
+              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-amber-900 leading-none">
+                {seg.available}%
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
