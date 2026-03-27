@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { parseISO } from 'date-fns';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
@@ -9,22 +9,51 @@ import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
 import { useUIStore } from '@/lib/stores/ui-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { formatManDaysPerWeek, getEngagementManDaysPerWeek } from '@/lib/utils/allocation';
+import {
+  allocationPercentageToManDays,
+  formatAllocationAsManDays,
+  formatManDaysPerWeek,
+} from '@/lib/utils/allocation';
 import { get12WeekWindow, getWeeksBetween, getWeekLabel } from '@/lib/utils/date-helpers';
 import { getWeeklyAllocations } from '@/lib/utils/availability';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { SENIORITY_ORDER, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant } from '@/lib/types/consultant';
 import type { Assignment } from '@/lib/types/assignment';
+import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const BASE_LANE_HEIGHT = 64;
-const HEADER_WIDTH = 220;
+const HEADER_WIDTH = 260;
 const GROUP_HEADER_HEIGHT = 36;
 const TOP_AXIS_HEIGHT = 48;
 const BLOCK_PADDING = 6;
 const MIN_BLOCK_WIDTH = 20;
 const BASE_BLOCK_HEIGHT = BASE_LANE_HEIGHT - BLOCK_PADDING * 2;
+const EFFORT_METER_SEGMENTS = 5;
+
+const ENGAGEMENT_STATUS_ORDER: Record<EngagementStatus, number> = {
+  at_risk: 0,
+  active: 1,
+  upcoming: 2,
+  completed: 3,
+};
+
+const ENGAGEMENT_STATUS_LABELS: Record<EngagementStatus, string> = {
+  at_risk: 'At Risk',
+  active: 'Active',
+  upcoming: 'Upcoming',
+  completed: 'Completed',
+};
+
+type TimelineViewMode = 'consultants' | 'projects';
 
 interface ConsultantGroup {
   practiceArea: string;
@@ -39,34 +68,56 @@ interface AssignmentLayout {
   yOffset: number;
 }
 
-interface ConsultantLaneLayout {
+interface LaneLayout {
   height: number;
   assignmentLayouts: Map<string, AssignmentLayout>;
 }
 
-function groupAndSortConsultants(
-  consultants: Consultant[],
-  practiceAreaFilter: string | null
-): ConsultantGroup[] {
-  let filtered = consultants;
-  if (practiceAreaFilter) {
-    filtered = consultants.filter((c) => c.practice_area === practiceAreaFilter);
-  }
+interface LanePlaceholder {
+  color: string;
+  end: Date;
+  label: string;
+  start: Date;
+  variant: 'filled' | 'outline';
+}
 
+interface TimelineLane {
+  id: string;
+  title: string;
+  subtitle: string;
+  assignments: Assignment[];
+  avatarUrl?: string;
+  alertDot?: boolean;
+  consultantId?: string;
+  engagementId?: string;
+  placeholder?: LanePlaceholder;
+  swatchColor?: string;
+}
+
+interface TimelineSection {
+  id: string;
+  label: string;
+  lanes: TimelineLane[];
+}
+
+function groupAndSortConsultants(consultants: Consultant[]): ConsultantGroup[] {
   const groups = new Map<string, Consultant[]>();
-  for (const c of filtered) {
-    const existing = groups.get(c.practice_area) || [];
-    existing.push(c);
-    groups.set(c.practice_area, existing);
+
+  for (const consultant of consultants) {
+    const existing = groups.get(consultant.practice_area) || [];
+    existing.push(consultant);
+    groups.set(consultant.practice_area, existing);
   }
 
   const result: ConsultantGroup[] = [];
+
   for (const [area, members] of groups) {
     members.sort(
       (a, b) =>
         (SENIORITY_ORDER[b.seniority_level] || 0) -
         (SENIORITY_ORDER[a.seniority_level] || 0)
     );
+
     result.push({
       practiceArea: area,
       label: PRACTICE_AREA_LABELS[area as keyof typeof PRACTICE_AREA_LABELS] || area,
@@ -78,12 +129,28 @@ function groupAndSortConsultants(
   return result;
 }
 
-function buildConsultantLaneLayout(
-  consultantAssignments: Assignment[],
+function groupAssignmentsByKey(
+  assignments: Assignment[],
+  getKey: (assignment: Assignment) => string
+) {
+  const groupedAssignments = new Map<string, Assignment[]>();
+
+  for (const assignment of assignments) {
+    const key = getKey(assignment);
+    const existing = groupedAssignments.get(key) || [];
+    existing.push(assignment);
+    groupedAssignments.set(key, existing);
+  }
+
+  return groupedAssignments;
+}
+
+function buildLaneLayout(
+  laneAssignments: Assignment[],
   viewStart: Date,
   viewEnd: Date
-): ConsultantLaneLayout {
-  const visibleAssignments = consultantAssignments
+): LaneLayout {
+  const visibleAssignments = laneAssignments
     .map((assignment) => {
       const assignmentStart = parseISO(assignment.start_date);
       const assignmentEnd = parseISO(assignment.end_date);
@@ -94,8 +161,7 @@ function buildConsultantLaneLayout(
 
       return {
         assignment,
-        clippedStart:
-          assignmentStart > viewStart ? assignmentStart : viewStart,
+        clippedStart: assignmentStart > viewStart ? assignmentStart : viewStart,
         clippedEnd: assignmentEnd < viewEnd ? assignmentEnd : viewEnd,
         height: (assignment.allocation_percentage / 100) * BASE_BLOCK_HEIGHT,
       };
@@ -119,9 +185,9 @@ function buildConsultantLaneLayout(
   }> = [];
   let maxContentHeight = BASE_BLOCK_HEIGHT;
 
-  // Pack visible assignments into the lowest available vertical slot so overlaps stack.
   for (const visibleAssignment of visibleAssignments) {
     const assignmentStart = visibleAssignment.clippedStart.getTime();
+
     activeAssignments = activeAssignments
       .filter((placement) => placement.clippedEnd > assignmentStart)
       .sort((a, b) => a.yOffset - b.yOffset);
@@ -147,10 +213,7 @@ function buildConsultantLaneLayout(
       yOffset,
     });
 
-    maxContentHeight = Math.max(
-      maxContentHeight,
-      yOffset + visibleAssignment.height
-    );
+    maxContentHeight = Math.max(maxContentHeight, yOffset + visibleAssignment.height);
   }
 
   return {
@@ -159,48 +222,142 @@ function buildConsultantLaneLayout(
   };
 }
 
-function groupAssignmentsByConsultant(assignments: Assignment[]) {
-  const assignmentsByConsultant = new Map<string, Assignment[]>();
-
-  for (const assignment of assignments) {
-    const consultantAssignments =
-      assignmentsByConsultant.get(assignment.consultant_id) || [];
-    consultantAssignments.push(assignment);
-    assignmentsByConsultant.set(assignment.consultant_id, consultantAssignments);
-  }
-
-  return assignmentsByConsultant;
-}
-
-function buildConsultantLaneLayouts(
-  groups: ConsultantGroup[],
-  assignmentsByConsultant: Map<string, Assignment[]>,
+function buildLaneLayouts(
+  sections: TimelineSection[],
   viewStart: Date,
   viewEnd: Date
 ) {
-  const consultantLaneLayouts = new Map<string, ConsultantLaneLayout>();
+  const laneLayouts = new Map<string, LaneLayout>();
 
-  for (const group of groups) {
-    for (const consultant of group.consultants) {
-      consultantLaneLayouts.set(
-        consultant.id,
-        buildConsultantLaneLayout(
-          assignmentsByConsultant.get(consultant.id) || [],
-          viewStart,
-          viewEnd
-        )
-      );
+  for (const section of sections) {
+    for (const lane of section.lanes) {
+      laneLayouts.set(lane.id, buildLaneLayout(lane.assignments, viewStart, viewEnd));
     }
   }
 
-  return consultantLaneLayouts;
+  return laneLayouts;
+}
+
+function appendTruncatedText(
+  blockGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  {
+    fill,
+    fontSize,
+    fontWeight,
+    maxWidth,
+    text,
+    x,
+    y,
+  }: {
+    fill: string;
+    fontSize: string;
+    fontWeight: string;
+    maxWidth: number;
+    text: string;
+    x: number;
+    y: number;
+  }
+) {
+  blockGroup
+    .append('text')
+    .attr('x', x)
+    .attr('y', y)
+    .attr('dy', '0.35em')
+    .attr('fill', fill)
+    .attr('font-size', fontSize)
+    .attr('font-weight', fontWeight)
+    .attr('pointer-events', 'none')
+    .text(text)
+    .each(function () {
+      const textEl = this as SVGTextElement;
+      if (textEl.getComputedTextLength() <= maxWidth) {
+        return;
+      }
+
+      let truncated = text;
+      while (truncated.length > 0 && textEl.getComputedTextLength() > maxWidth) {
+        truncated = truncated.slice(0, -1);
+        textEl.textContent = `${truncated}…`;
+      }
+    });
+}
+
+function appendEffortMeter(
+  blockGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  allocationPercentage: number
+) {
+  if (width < 84 || height < 12) {
+    return;
+  }
+
+  const meterWidth = Math.min(56, width - 16);
+  const segmentGap = 2;
+  const segmentWidth =
+    (meterWidth - segmentGap * (EFFORT_METER_SEGMENTS - 1)) / EFFORT_METER_SEGMENTS;
+  const meterHeight = height >= 20 ? 5 : 4;
+  const meterX = width >= 112 ? x + width - meterWidth - 8 : x + 8;
+  const meterY = y + height - meterHeight - 5;
+  const manDays = Math.max(0, Math.min(5, allocationPercentageToManDays(allocationPercentage)));
+  const meterGroup = blockGroup.append('g').attr('pointer-events', 'none');
+
+  for (let index = 0; index < EFFORT_METER_SEGMENTS; index += 1) {
+    const segmentX = meterX + index * (segmentWidth + segmentGap);
+    const filledPortion = Math.max(0, Math.min(1, manDays - index));
+
+    meterGroup
+      .append('rect')
+      .attr('x', segmentX)
+      .attr('y', meterY)
+      .attr('width', segmentWidth)
+      .attr('height', meterHeight)
+      .attr('rx', meterHeight / 2)
+      .attr('ry', meterHeight / 2)
+      .attr('fill', 'rgba(255,255,255,0.18)');
+
+    if (filledPortion > 0) {
+      meterGroup
+        .append('rect')
+        .attr('x', segmentX)
+        .attr('y', meterY)
+        .attr('width', segmentWidth * filledPortion)
+        .attr('height', meterHeight)
+        .attr('rx', meterHeight / 2)
+        .attr('ry', meterHeight / 2)
+        .attr('fill', 'rgba(255,255,255,0.92)');
+    }
+  }
+}
+
+function sortEngagements(a: Engagement, b: Engagement) {
+  const statusDiff =
+    ENGAGEMENT_STATUS_ORDER[a.status] - ENGAGEMENT_STATUS_ORDER[b.status];
+  if (statusDiff !== 0) {
+    return statusDiff;
+  }
+
+  const startDiff =
+    parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime();
+  if (startDiff !== 0) {
+    return startDiff;
+  }
+
+  const clientDiff = a.client_name.localeCompare(b.client_name);
+  if (clientDiff !== 0) {
+    return clientDiff;
+  }
+
+  return a.project_name.localeCompare(b.project_name);
 }
 
 export function SwimLaneChart() {
   const svgRef = useRef<SVGSVGElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(900);
+  const [viewMode, setViewMode] = useState<TimelineViewMode>('consultants');
 
   const consultants = useConsultantStore((s) => s.consultants);
   const engagements = useEngagementStore((s) => s.engagements);
@@ -215,81 +372,250 @@ export function SwimLaneChart() {
   const practiceAreaFilter =
     currentUser?.role === 'manager' ? currentUser.practice_area : null;
 
-  const groups = groupAndSortConsultants(consultants, practiceAreaFilter);
-
-  const assignedEngagementIds = new Set(assignments.map((a) => a.engagement_id));
-  const unassignedEngagements = engagements.filter((e) => !assignedEngagementIds.has(e.id));
   const { start, end } = get12WeekWindow(weekOffset);
-  const weeks = getWeeksBetween(start, end);
-  const chartWidth = Math.max(containerWidth - HEADER_WIDTH, weeks.length * 80);
-  const assignmentsByConsultant = groupAssignmentsByConsultant(assignments);
-  const consultantLaneLayouts = buildConsultantLaneLayouts(
-    groups,
-    assignmentsByConsultant,
-    start,
-    end
+
+  const visibleConsultants = useMemo(() => {
+    if (!practiceAreaFilter) {
+      return consultants;
+    }
+
+    return consultants.filter((consultant) => consultant.practice_area === practiceAreaFilter);
+  }, [consultants, practiceAreaFilter]);
+
+  const consultantById = useMemo(
+    () => new Map(consultants.map((consultant) => [consultant.id, consultant])),
+    [consultants]
   );
 
-  // Calculate total height
-  let totalHeight = 0;
-  for (const group of groups) {
-    totalHeight += GROUP_HEADER_HEIGHT;
-    totalHeight += group.consultants.reduce((height, consultant) => {
-      return (
-        height +
-        (consultantLaneLayouts.get(consultant.id)?.height || BASE_LANE_HEIGHT)
-      );
-    }, 0);
-  }
-  if (unassignedEngagements.length > 0) {
-    totalHeight += GROUP_HEADER_HEIGHT;
-    totalHeight += unassignedEngagements.length * BASE_LANE_HEIGHT;
-  }
+  const engagementById = useMemo(
+    () => new Map(engagements.map((engagement) => [engagement.id, engagement])),
+    [engagements]
+  );
 
-  // Resize observer
+  const visibleConsultantIds = useMemo(
+    () => new Set(visibleConsultants.map((consultant) => consultant.id)),
+    [visibleConsultants]
+  );
+
+  const visibleAssignments = useMemo(() => {
+    if (!practiceAreaFilter) {
+      return assignments;
+    }
+
+    return assignments.filter((assignment) => visibleConsultantIds.has(assignment.consultant_id));
+  }, [assignments, practiceAreaFilter, visibleConsultantIds]);
+
+  const burnoutByConsultantId = useMemo(() => {
+    const burnoutMap = new Map<string, number>();
+
+    for (const consultant of visibleConsultants) {
+      burnoutMap.set(
+        consultant.id,
+        calculateBurnoutRisk(consultant.id, assignments, signals)
+      );
+    }
+
+    return burnoutMap;
+  }, [visibleConsultants, assignments, signals]);
+
+  const consultantGroups = useMemo(
+    () => groupAndSortConsultants(visibleConsultants),
+    [visibleConsultants]
+  );
+
+  const assignedEngagementIds = useMemo(
+    () => new Set(assignments.map((assignment) => assignment.engagement_id)),
+    [assignments]
+  );
+
+  const visibleAssignedEngagementIds = useMemo(
+    () => new Set(visibleAssignments.map((assignment) => assignment.engagement_id)),
+    [visibleAssignments]
+  );
+
+  const unassignedEngagements = useMemo(
+    () => engagements.filter((engagement) => !assignedEngagementIds.has(engagement.id)),
+    [engagements, assignedEngagementIds]
+  );
+
+  const projectEngagements = useMemo(() => {
+    const sortedEngagements = [...engagements].sort(sortEngagements);
+
+    if (!practiceAreaFilter) {
+      return sortedEngagements;
+    }
+
+    return sortedEngagements.filter(
+      (engagement) =>
+        visibleAssignedEngagementIds.has(engagement.id) ||
+        !assignedEngagementIds.has(engagement.id)
+    );
+  }, [
+    engagements,
+    practiceAreaFilter,
+    visibleAssignedEngagementIds,
+    assignedEngagementIds,
+  ]);
+
+  const consultantSections = useMemo(() => {
+    const assignmentsByConsultant = groupAssignmentsByKey(
+      visibleAssignments,
+      (assignment) => assignment.consultant_id
+    );
+
+    const sections: TimelineSection[] = consultantGroups.map((group) => ({
+      id: `practice-area:${group.practiceArea}`,
+      label: group.label,
+      lanes: group.consultants.map((consultant) => ({
+        id: `consultant:${consultant.id}`,
+        alertDot: (burnoutByConsultantId.get(consultant.id) || 0) >= 60,
+        assignments: assignmentsByConsultant.get(consultant.id) || [],
+        avatarUrl: consultant.avatar_url,
+        consultantId: consultant.id,
+        subtitle: consultant.role,
+        title: consultant.name,
+      })),
+    }));
+
+    if (unassignedEngagements.length > 0) {
+      sections.push({
+        id: 'unassigned-engagements',
+        label: 'Unassigned',
+        lanes: unassignedEngagements.map((engagement) => ({
+          id: `unassigned:${engagement.id}`,
+          assignments: [],
+          engagementId: engagement.id,
+          placeholder: {
+            color: engagement.color,
+            end: parseISO(engagement.end_date),
+            label: 'Unassigned',
+            start: parseISO(engagement.start_date),
+            variant: 'filled',
+          },
+          subtitle: engagement.project_name,
+          swatchColor: engagement.color,
+          title: engagement.client_name,
+        })),
+      });
+    }
+
+    return sections;
+  }, [burnoutByConsultantId, consultantGroups, unassignedEngagements, visibleAssignments]);
+
+  const projectSections = useMemo(() => {
+    const assignmentsByEngagement = groupAssignmentsByKey(
+      visibleAssignments,
+      (assignment) => assignment.engagement_id
+    );
+
+    const engagementsByStatus = new Map<EngagementStatus, Engagement[]>();
+
+    for (const engagement of projectEngagements) {
+      const existing = engagementsByStatus.get(engagement.status) || [];
+      existing.push(engagement);
+      engagementsByStatus.set(engagement.status, existing);
+    }
+
+    return (Object.keys(ENGAGEMENT_STATUS_ORDER) as EngagementStatus[])
+      .map((status) => {
+        const statusEngagements = engagementsByStatus.get(status) || [];
+        const lanes: TimelineLane[] = statusEngagements.map((engagement) => {
+          const laneAssignments = assignmentsByEngagement.get(engagement.id) || [];
+          const assignedCount = laneAssignments.length;
+          const totalManDays = allocationPercentageToManDays(
+            laneAssignments.reduce(
+              (total, assignment) => total + assignment.allocation_percentage,
+              0
+            )
+          );
+
+          return {
+            id: `engagement:${engagement.id}`,
+            assignments: laneAssignments,
+            engagementId: engagement.id,
+            placeholder:
+              assignedCount === 0
+                ? {
+                    color: engagement.color,
+                    end: parseISO(engagement.end_date),
+                    label: 'No consultants assigned',
+                    start: parseISO(engagement.start_date),
+                    variant: 'outline',
+                  }
+                : undefined,
+            subtitle:
+              assignedCount === 0
+                ? `${engagement.client_name} · Unstaffed`
+                : `${engagement.client_name} · ${
+                    assignedCount === 1 ? '1 consultant' : `${assignedCount} consultants`
+                  } · ${formatManDaysPerWeek(totalManDays, 'compact')} total`,
+            swatchColor: engagement.color,
+            title: engagement.project_name,
+          };
+        });
+
+        return {
+          id: `status:${status}`,
+          label: ENGAGEMENT_STATUS_LABELS[status],
+          lanes,
+        };
+      })
+      .filter((section) => section.lanes.length > 0);
+  }, [projectEngagements, visibleAssignments]);
+
+  const sections = viewMode === 'consultants' ? consultantSections : projectSections;
+
+  const weeks = useMemo(() => getWeeksBetween(start, end), [start, end]);
+
+  const chartWidth = Math.max(containerWidth - HEADER_WIDTH, weeks.length * 80);
+
+  const laneLayouts = useMemo(
+    () => buildLaneLayouts(sections, start, end),
+    [sections, start, end]
+  );
+
+  const totalHeight = useMemo(() => {
+    return sections.reduce((height, section) => {
+      const laneHeight = section.lanes.reduce(
+        (sectionHeight, lane) =>
+          sectionHeight + (laneLayouts.get(lane.id)?.height || BASE_LANE_HEIGHT),
+        0
+      );
+
+      return height + GROUP_HEADER_HEIGHT + laneHeight;
+    }, 0);
+  }, [laneLayouts, sections]);
+
+  const openEngagement = (engagementId: string) => {
+    setSelectedEngagement(engagementId);
+    setDrawerOpen(true);
+  };
+
   useEffect(() => {
     const container = scrollRef.current?.parentElement;
     if (!container) return;
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
       }
     });
+
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
-  // D3 rendering
   useEffect(() => {
     if (!svgRef.current) return;
-    if (consultants.length === 0 && unassignedEngagements.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    const effectAssignmentsByConsultant = groupAssignmentsByConsultant(assignments);
-    const effectConsultantLaneLayouts = buildConsultantLaneLayouts(
-      groups,
-      effectAssignmentsByConsultant,
-      start,
-      end
-    );
-    const engagementManDaysById = new Map<string, number>();
-    for (const engagement of engagements) {
-      engagementManDaysById.set(
-        engagement.id,
-        getEngagementManDaysPerWeek(engagement.id, assignments)
-      );
-    }
 
-    const xScale = d3
-      .scaleTime()
-      .domain([start, end])
-      .range([0, chartWidth]);
+    if (sections.length === 0) return;
 
-    // Defs for gradients and filters
+    const xScale = d3.scaleTime().domain([start, end]).range([0, chartWidth]);
+
     const defs = svg.append('defs');
-
-    // Drop shadow filter
     const filter = defs.append('filter').attr('id', 'block-shadow');
     filter
       .append('feDropShadow')
@@ -298,8 +624,8 @@ export function SwimLaneChart() {
       .attr('stdDeviation', 2)
       .attr('flood-opacity', 0.15);
 
-    // Background grid lines (week columns)
     const gridGroup = svg.append('g').attr('class', 'grid');
+
     for (const week of weeks) {
       const x = xScale(week);
       gridGroup
@@ -312,7 +638,6 @@ export function SwimLaneChart() {
         .attr('stroke-width', 1);
     }
 
-    // Current week indicator
     const now = new Date();
     if (now >= start && now <= end) {
       const nowX = xScale(now);
@@ -328,54 +653,52 @@ export function SwimLaneChart() {
         .attr('opacity', 0.5);
     }
 
-    // Render each lane
     let currentY = 0;
-    for (const group of groups) {
-      // Practice area group header
+
+    for (const section of sections) {
       currentY += GROUP_HEADER_HEIGHT;
 
-      for (const consultant of group.consultants) {
+      for (const lane of section.lanes) {
         const laneY = currentY;
-        const laneLayout =
-          effectConsultantLaneLayouts.get(consultant.id) || {
-            height: BASE_LANE_HEIGHT,
-            assignmentLayouts: new Map<string, AssignmentLayout>(),
-          };
+        const laneLayout = laneLayouts.get(lane.id) || {
+          height: BASE_LANE_HEIGHT,
+          assignmentLayouts: new Map<string, AssignmentLayout>(),
+        };
         const laneHeight = laneLayout.height;
 
-        // Burnout heat wash
-        const burnoutScore = calculateBurnoutRisk(
-          consultant.id,
-          assignments,
-          signals
-        );
-        if (burnoutScore > 30) {
-          // Full lane background wash — intensity proportional to burnout score
-          const baseIntensity = Math.min(0.15, (burnoutScore / 100) * 0.18);
-          svg
-            .append('rect')
-            .attr('x', 0)
-            .attr('y', laneY)
-            .attr('width', chartWidth)
-            .attr('height', laneHeight)
-            .attr('fill', `rgba(239, 68, 68, ${baseIntensity})`)
-            .attr('pointer-events', 'none');
+        if (lane.consultantId) {
+          const burnoutScore = burnoutByConsultantId.get(lane.consultantId) || 0;
 
-          // Per-week intensity overlay for high-allocation weeks
-          const burnoutAllocations = getWeeklyAllocations(
-            consultant.id,
-            assignments,
-            start,
-            end
-          );
-          for (const alloc of burnoutAllocations) {
-            if (alloc.allocation > 80) {
-              const weekX = xScale(alloc.weekStart);
+          if (burnoutScore > 30) {
+            const baseIntensity = Math.min(0.15, (burnoutScore / 100) * 0.18);
+            svg
+              .append('rect')
+              .attr('x', 0)
+              .attr('y', laneY)
+              .attr('width', chartWidth)
+              .attr('height', laneHeight)
+              .attr('fill', `rgba(239, 68, 68, ${baseIntensity})`)
+              .attr('pointer-events', 'none');
+
+            const burnoutAllocations = getWeeklyAllocations(
+              lane.consultantId,
+              visibleAssignments,
+              start,
+              end
+            );
+
+            for (const allocation of burnoutAllocations) {
+              if (allocation.allocation <= 80) {
+                continue;
+              }
+
+              const weekX = xScale(allocation.weekStart);
               const weekWidth = chartWidth / weeks.length;
               const weekIntensity = Math.min(
                 0.12,
-                ((alloc.allocation - 80) / 100) * 0.15
+                ((allocation.allocation - 80) / 100) * 0.15
               );
+
               svg
                 .append('rect')
                 .attr('x', weekX)
@@ -386,19 +709,22 @@ export function SwimLaneChart() {
                 .attr('pointer-events', 'none');
             }
           }
-        }
 
-        // Availability glow (green for available weeks)
-        const allocations = getWeeklyAllocations(
-          consultant.id,
-          assignments,
-          start,
-          end
-        );
-        for (const alloc of allocations) {
-          if (alloc.allocation < 40) {
-            const weekX = xScale(alloc.weekStart);
+          const allocations = getWeeklyAllocations(
+            lane.consultantId,
+            visibleAssignments,
+            start,
+            end
+          );
+
+          for (const allocation of allocations) {
+            if (allocation.allocation >= 40) {
+              continue;
+            }
+
+            const weekX = xScale(allocation.weekStart);
             const weekWidth = chartWidth / weeks.length;
+
             svg
               .append('rect')
               .attr('x', weekX)
@@ -411,7 +737,6 @@ export function SwimLaneChart() {
           }
         }
 
-        // Lane bottom border
         svg
           .append('line')
           .attr('x1', 0)
@@ -421,28 +746,107 @@ export function SwimLaneChart() {
           .attr('stroke', '#f1f5f9')
           .attr('stroke-width', 1);
 
-        // Engagement blocks for this consultant
-        const consultantAssignments =
-          effectAssignmentsByConsultant.get(consultant.id) || [];
+        if (lane.placeholder) {
+          const placeholderStart = lane.placeholder.start;
+          const placeholderEnd = lane.placeholder.end;
 
-        for (const assignment of consultantAssignments) {
-          const engagement = engagements.find(
-            (e) => e.id === assignment.engagement_id
-          );
-          if (!engagement) continue;
+          if (!(placeholderEnd < start || placeholderStart > end)) {
+            const x = Math.max(0, xScale(placeholderStart));
+            const x2 = Math.min(chartWidth, xScale(placeholderEnd));
+            const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
+            const placeholderGroup = svg.append('g').attr('class', 'placeholder-block');
 
+            placeholderGroup
+              .append('rect')
+              .attr('x', x + 2)
+              .attr('y', laneY + BLOCK_PADDING)
+              .attr('width', width - 4)
+              .attr('height', BASE_BLOCK_HEIGHT)
+              .attr('rx', 6)
+              .attr('ry', 6)
+              .attr('fill', lane.placeholder.color)
+              .attr('fill-opacity', lane.placeholder.variant === 'filled' ? 0.72 : 0.08)
+              .attr('stroke', lane.placeholder.color)
+              .attr('stroke-width', lane.placeholder.variant === 'filled' ? 0 : 1.5)
+              .attr('stroke-dasharray', lane.placeholder.variant === 'outline' ? '6,4' : null)
+              .attr('cursor', lane.engagementId ? 'pointer' : 'default')
+              .attr('filter', 'url(#block-shadow)')
+              .on('mouseenter', function () {
+                d3.select(this)
+                  .transition()
+                  .duration(150)
+                  .attr(
+                    'fill-opacity',
+                    lane.placeholder?.variant === 'filled' ? 0.88 : 0.14
+                  )
+                  .attr(
+                    'stroke-width',
+                    lane.placeholder?.variant === 'filled' ? 0 : 2
+                  );
+              })
+              .on('mouseleave', function () {
+                d3.select(this)
+                  .transition()
+                  .duration(150)
+                  .attr(
+                    'fill-opacity',
+                    lane.placeholder?.variant === 'filled' ? 0.72 : 0.08
+                  )
+                  .attr(
+                    'stroke-width',
+                    lane.placeholder?.variant === 'filled' ? 0 : 1.5
+                  );
+              })
+              .on('click', () => {
+                if (lane.engagementId) {
+                  setSelectedEngagement(lane.engagementId);
+                  setDrawerOpen(true);
+                }
+              });
+
+            if (width > 90) {
+              appendTruncatedText(placeholderGroup, {
+                fill:
+                  lane.placeholder.variant === 'filled'
+                    ? 'white'
+                    : 'rgba(15, 23, 42, 0.78)',
+                fontSize: '11px',
+                fontWeight: '600',
+                maxWidth: width - 20,
+                text: lane.placeholder.label,
+                x: x + 10,
+                y: laneY + BASE_LANE_HEIGHT / 2 + 1,
+              });
+            }
+          }
+        }
+
+        for (const assignment of lane.assignments) {
+          const engagement = engagementById.get(assignment.engagement_id);
+          const consultant = consultantById.get(assignment.consultant_id);
           const assignmentLayout = laneLayout.assignmentLayouts.get(assignment.id);
-          if (!assignmentLayout) continue;
+
+          if (!engagement || !assignmentLayout) {
+            continue;
+          }
 
           const x = Math.max(0, xScale(assignmentLayout.clippedStart));
           const x2 = Math.min(chartWidth, xScale(assignmentLayout.clippedEnd));
           const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
           const blockY = laneY + BLOCK_PADDING + assignmentLayout.yOffset;
           const blockHeight = assignmentLayout.height;
-
           const blockGroup = svg.append('g').attr('class', 'engagement-block');
-
           const opacity = 0.92;
+          const primaryLabel =
+            viewMode === 'projects'
+              ? consultant
+                ? width > 152
+                  ? `${consultant.name} — ${consultant.role}`
+                  : consultant.name
+                : 'Unassigned consultant'
+              : width > 152
+                ? `${engagement.client_name} — ${engagement.project_name}`
+                : engagement.client_name;
 
           blockGroup
             .append('rect')
@@ -476,159 +880,63 @@ export function SwimLaneChart() {
               setDrawerOpen(true);
             });
 
-          // Text label
-          if (width > 60 && blockHeight >= 18) {
-            const label =
-              width > 140
-                ? `${engagement.client_name} — ${engagement.project_name}`
-                : engagement.client_name;
-
-            blockGroup
-              .append('text')
-              .attr('x', x + 10)
-              .attr('y', blockY + blockHeight / 2 + 1)
-              .attr('dy', '0.35em')
-              .attr('fill', 'white')
-              .attr('font-size', '11px')
-              .attr('font-weight', '500')
-              .attr('pointer-events', 'none')
-              .text(label)
-              .each(function () {
-                const textEl = this as SVGTextElement;
-                const maxWidth = width - 20;
-                if (textEl.getComputedTextLength() > maxWidth) {
-                  let text = label;
-                  while (
-                    textEl.getComputedTextLength() > maxWidth &&
-                    text.length > 0
-                  ) {
-                    text = text.slice(0, -1);
-                    textEl.textContent = text + '…';
-                  }
-                }
-              });
+          if (width > 60 && blockHeight >= 14) {
+            appendTruncatedText(blockGroup, {
+              fill: 'white',
+              fontSize: blockHeight >= 20 ? '11px' : '10px',
+              fontWeight: '500',
+              maxWidth: width - 20,
+              text: primaryLabel,
+              x: x + 10,
+              y: blockHeight >= 24 ? blockY + 12 : blockY + blockHeight / 2 + 1,
+            });
           }
 
-          // Project effort badge
-          if (width > 72 && blockHeight >= 12) {
+          if (width > 112 && blockHeight >= 22) {
             blockGroup
               .append('text')
               .attr('x', x + width - 8)
               .attr('y', blockY + 12)
               .attr('text-anchor', 'end')
-              .attr('fill', 'rgba(255,255,255,0.8)')
+              .attr('fill', 'rgba(255,255,255,0.82)')
               .attr('font-size', '9px')
               .attr('font-weight', '600')
               .attr('pointer-events', 'none')
-              .text(
-                formatManDaysPerWeek(
-                  engagementManDaysById.get(engagement.id) || 0,
-                  'compact'
-                )
-              );
+              .text(formatAllocationAsManDays(assignment.allocation_percentage, 'compact'));
           }
+
+          appendEffortMeter(
+            blockGroup,
+            x,
+            blockY,
+            width,
+            blockHeight,
+            assignment.allocation_percentage
+          );
         }
 
         currentY += laneHeight;
       }
     }
-
-    // Unassigned Projects section
-    if (unassignedEngagements.length > 0) {
-      currentY += GROUP_HEADER_HEIGHT;
-
-      for (const engagement of unassignedEngagements) {
-        const laneY = currentY;
-
-        svg
-          .append('line')
-          .attr('x1', 0)
-          .attr('y1', laneY + BASE_LANE_HEIGHT)
-          .attr('x2', chartWidth)
-          .attr('y2', laneY + BASE_LANE_HEIGHT)
-          .attr('stroke', '#f1f5f9')
-          .attr('stroke-width', 1);
-
-        const blockStart = parseISO(engagement.start_date);
-        const blockEnd = parseISO(engagement.end_date);
-
-        if (!(blockEnd < start || blockStart > end)) {
-          const x = Math.max(0, xScale(blockStart));
-          const x2 = Math.min(chartWidth, xScale(blockEnd));
-          const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
-          const blockGroup = svg.append('g').attr('class', 'engagement-block');
-
-          blockGroup
-            .append('rect')
-            .attr('x', x + 2)
-            .attr('y', laneY + BLOCK_PADDING)
-            .attr('width', width - 4)
-            .attr('height', BASE_BLOCK_HEIGHT)
-            .attr('rx', 6)
-            .attr('ry', 6)
-            .attr('fill', engagement.color)
-            .attr('opacity', 0.7)
-            .attr('cursor', 'pointer')
-            .attr('filter', 'url(#block-shadow)')
-            .on('mouseenter', function () {
-              d3.select(this).transition().duration(150)
-                .attr('opacity', 0.9)
-                .attr('y', laneY + BLOCK_PADDING - 1)
-                .attr('height', BASE_BLOCK_HEIGHT + 2);
-            })
-            .on('mouseleave', function () {
-              d3.select(this).transition().duration(150)
-                .attr('opacity', 0.7)
-                .attr('y', laneY + BLOCK_PADDING)
-                .attr('height', BASE_BLOCK_HEIGHT);
-            })
-            .on('click', () => {
-              setSelectedEngagement(engagement.id);
-              setDrawerOpen(true);
-            });
-
-          if (width > 60) {
-            const label =
-              width > 140
-                ? `${engagement.client_name} — ${engagement.project_name}`
-                : engagement.client_name;
-
-            blockGroup
-              .append('text')
-              .attr('x', x + 10)
-              .attr('y', laneY + BASE_LANE_HEIGHT / 2 + 1)
-              .attr('dy', '0.35em')
-              .attr('fill', 'white')
-              .attr('font-size', '11px')
-              .attr('font-weight', '500')
-              .attr('pointer-events', 'none')
-              .text(label);
-          }
-        }
-
-        currentY += BASE_LANE_HEIGHT;
-      }
-    }
   }, [
-    consultants,
-    engagements,
-    assignments,
-    unassignedEngagements,
-    signals,
-    weekOffset,
+    burnoutByConsultantId,
     chartWidth,
-    start,
+    consultantById,
+    engagementById,
     end,
-    weeks,
-    groups,
+    laneLayouts,
+    sections,
+    start,
     totalHeight,
-    setSelectedEngagement,
+    viewMode,
+    visibleAssignments,
+    weeks,
     setDrawerOpen,
+    setSelectedEngagement,
   ]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Top controls */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-white">
         <div className="flex items-center gap-2">
           <Button
@@ -649,29 +957,50 @@ export function SwimLaneChart() {
             Later →
           </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setWeekOffset(0)}
-          className={weekOffset === 0 ? 'opacity-50' : ''}
-        >
-          Today
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            View
+          </span>
+          <Select
+            value={viewMode}
+            onValueChange={(value) => {
+              startTransition(() => {
+                setViewMode(value as TimelineViewMode);
+              });
+            }}
+          >
+            <SelectTrigger className="min-w-40 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="consultants">Consultant View</SelectItem>
+              <SelectItem value="projects">Project View</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekOffset(0)}
+            className={weekOffset === 0 ? 'opacity-50' : ''}
+          >
+            Today
+          </Button>
+        </div>
       </div>
 
-      {/* Time axis header */}
       <div className="flex border-b bg-slate-50/50" style={{ minHeight: TOP_AXIS_HEIGHT }}>
         <div
           className="shrink-0 flex items-end px-4 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-r bg-white"
           style={{ width: HEADER_WIDTH }}
         >
-          Consultants
+          {viewMode === 'consultants' ? 'Consultants' : 'Projects'}
         </div>
         <div className="flex-1 overflow-hidden">
           <div className="flex" style={{ width: chartWidth }}>
-            {weeks.map((week, i) => (
+            {weeks.map((week) => (
               <div
-                key={i}
+                key={week.toISOString()}
                 className="flex items-end pb-2 text-[11px] text-muted-foreground font-medium"
                 style={{ width: chartWidth / weeks.length }}
               >
@@ -682,63 +1011,61 @@ export function SwimLaneChart() {
         </div>
       </div>
 
-      {/* Main chart area — single scroll container */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-auto"
-      >
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex" style={{ minWidth: chartWidth + HEADER_WIDTH }}>
-          {/* Lane headers (sticky left) */}
           <div
-            ref={headerRef}
             className="shrink-0 sticky left-0 z-10 border-r bg-white"
             style={{ width: HEADER_WIDTH }}
           >
-            {groups.map((group) => {
-              const items: React.ReactNode[] = [];
-
-              // Group header
-              items.push(
+            {sections.map((section) => {
+              const items = [
                 <div
-                  key={`group-${group.practiceArea}`}
+                  key={`section-${section.id}`}
                   className="flex items-center px-4 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-slate-50 border-b"
                   style={{ height: GROUP_HEADER_HEIGHT }}
                 >
-                  {group.label}
-                </div>
-              );
+                  {section.label}
+                </div>,
+              ];
 
-              // Consultant lanes
-              for (const consultant of group.consultants) {
-                const burnout = calculateBurnoutRisk(
-                  consultant.id,
-                  assignments,
-                  signals
-                );
+              for (const lane of section.lanes) {
+                const laneHeight = laneLayouts.get(lane.id)?.height || BASE_LANE_HEIGHT;
+                const isClickable = Boolean(lane.engagementId);
+
                 items.push(
                   <div
-                    key={consultant.id}
-                    className="flex items-center gap-3 px-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
-                    style={{
-                      height:
-                        consultantLaneLayouts.get(consultant.id)?.height ||
-                        BASE_LANE_HEIGHT,
+                    key={lane.id}
+                    className={`flex items-center gap-3 px-4 border-b border-slate-100 transition-colors ${
+                      isClickable ? 'hover:bg-slate-50/50 cursor-pointer' : 'hover:bg-slate-50/50'
+                    }`}
+                    style={{ height: laneHeight }}
+                    onClick={() => {
+                      if (lane.engagementId) {
+                        openEngagement(lane.engagementId);
+                      }
                     }}
                   >
-                    <img
-                      src={consultant.avatar_url}
-                      alt={consultant.name}
-                      className="h-8 w-8 rounded-full bg-slate-100"
-                    />
+                    {lane.avatarUrl ? (
+                      <img
+                        src={lane.avatarUrl}
+                        alt={lane.title}
+                        className="h-8 w-8 rounded-full bg-slate-100"
+                      />
+                    ) : lane.swatchColor ? (
+                      <div
+                        className="h-3 w-3 rounded-sm shrink-0"
+                        style={{ backgroundColor: lane.swatchColor }}
+                      />
+                    ) : null}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate leading-tight">
-                        {consultant.name}
+                        {lane.title}
                       </p>
                       <p className="text-[11px] text-muted-foreground truncate">
-                        {consultant.role}
+                        {lane.subtitle}
                       </p>
                     </div>
-                    {burnout >= 60 && (
+                    {lane.alertDot && (
                       <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                     )}
                   </div>
@@ -747,40 +1074,8 @@ export function SwimLaneChart() {
 
               return items;
             })}
-          {unassignedEngagements.length > 0 && (
-            <>
-              <div
-                className="flex items-center px-4 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-slate-50 border-b"
-                style={{ height: GROUP_HEADER_HEIGHT }}
-              >
-                Unassigned
-              </div>
-              {unassignedEngagements.map((engagement) => (
-                <div
-                  key={engagement.id}
-                  className="flex items-center gap-3 px-4 border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
-                  style={{ height: BASE_LANE_HEIGHT }}
-                  onClick={() => { setSelectedEngagement(engagement.id); setDrawerOpen(true); }}
-                >
-                  <div
-                    className="h-3 w-3 rounded-sm shrink-0"
-                    style={{ backgroundColor: engagement.color }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate leading-tight">
-                      {engagement.client_name}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {engagement.project_name}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
           </div>
 
-          {/* SVG chart */}
           <div className="flex-1">
             <svg
               ref={svgRef}
