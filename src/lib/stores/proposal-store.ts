@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authFetch } from '../api/auth-fetch';
 import type { ProposalSlot, Proposal } from '../types';
 
 const DEFAULT_SLOTS: ProposalSlot[] = [
@@ -48,7 +49,7 @@ export const useProposalStore = create<ProposalStore>((set) => ({
     set({ slots: DEFAULT_SLOTS.map((s) => ({ ...s })) }),
 
   saveProposal: async (proposal) => {
-    const res = await fetch('/api/proposals', {
+    const res = await authFetch('/api/proposals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(proposal),
@@ -60,7 +61,7 @@ export const useProposalStore = create<ProposalStore>((set) => ({
   },
 
   fetchProposals: async () => {
-    const res = await fetch('/api/proposals');
+    const res = await authFetch('/api/proposals');
     const data = await res.json();
     set({ savedProposals: data });
   },

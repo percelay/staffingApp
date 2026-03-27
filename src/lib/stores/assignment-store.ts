@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authFetch } from '../api/auth-fetch';
 import type { Assignment } from '../types';
 
 interface AssignmentStore {
@@ -33,7 +34,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   fetchAssignments: async () => {
     set({ loading: true });
-    const res = await fetch('/api/assignments');
+    const res = await authFetch('/api/assignments');
     const data = await res.json();
     set({ assignments: data, loading: false });
   },
@@ -45,7 +46,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   createAssignment: async (data) => {
     try {
-      const res = await fetch('/api/assignments', {
+      const res = await authFetch('/api/assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -65,7 +66,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   updateAssignment: async (id, data) => {
     try {
-      const res = await fetch(`/api/assignments/${id}`, {
+      const res = await authFetch(`/api/assignments/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -87,7 +88,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   removeAssignment: async (assignmentId) => {
     try {
-      await fetch(`/api/assignments/${assignmentId}`, { method: 'DELETE' });
+      await authFetch(`/api/assignments/${assignmentId}`, { method: 'DELETE' });
     } catch {
       // API unavailable — still remove locally
     }
@@ -98,7 +99,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   moveAssignment: async (assignmentId, newConsultantId, newStartDate, newEndDate) => {
     try {
-      const res = await fetch(`/api/assignments/${assignmentId}`, {
+      const res = await authFetch(`/api/assignments/${assignmentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

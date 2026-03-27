@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authFetch } from '../api/auth-fetch';
 import type { WellbeingSignal } from '../types';
 
 interface WellbeingStore {
@@ -25,7 +26,7 @@ export const useWellbeingStore = create<WellbeingStore>((set, get) => ({
 
   fetchSignals: async () => {
     set({ loading: true });
-    const res = await fetch('/api/wellbeing');
+    const res = await authFetch('/api/wellbeing');
     const data = await res.json();
     set({ signals: data, loading: false });
   },
@@ -36,7 +37,7 @@ export const useWellbeingStore = create<WellbeingStore>((set, get) => ({
     get().signals.filter((s) => s.severity === 'high'),
 
   addSignal: async (data) => {
-    const res = await fetch('/api/wellbeing', {
+    const res = await authFetch('/api/wellbeing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

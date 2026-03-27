@@ -1,6 +1,6 @@
-import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { toAssignmentDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 /**
  * PATCH /api/assignments/:id
@@ -13,12 +13,9 @@ import { toAssignmentDTO } from '@/lib/api/transformers';
  *   - Change role:       { role: "manager" }
  *   - Reassign:          { consultant_id: "new-id" }
  */
-export async function PATCH(
-  request: NextRequest,
-  ctx: RouteContext<'/api/assignments/[id]'>
-) {
+export const PATCH = withAuth('assignments', async (request) => {
   try {
-    const { id } = await ctx.params;
+    const id = request.url.split('/api/assignments/')[1]?.split('/')[0]?.split('?')[0];
     const body = await request.json();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,23 +38,20 @@ export async function PATCH(
     console.error('[PATCH /api/assignments/:id]', err);
     return Response.json({ error: 'Failed to update assignment' }, { status: 500 });
   }
-}
+});
 
 /**
  * DELETE /api/assignments/:id
  * Remove a consultant from a project.
  * Their utilization automatically decreases.
  */
-export async function DELETE(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/assignments/[id]'>
-) {
+export const DELETE = withAuth('assignments', async (request) => {
   try {
-    const { id } = await ctx.params;
+    const id = request.url.split('/api/assignments/')[1]?.split('/')[0]?.split('?')[0];
     await prisma.assignment.delete({ where: { id } });
     return Response.json({ success: true });
   } catch (err) {
     console.error('[DELETE /api/assignments/:id]', err);
     return Response.json({ error: 'Failed to delete assignment' }, { status: 500 });
   }
-}
+});

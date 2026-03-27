@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { toConsultantDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * Query params: ?status=active|on_leave|departed (default: active)
  *               ?practiceArea=strategy|operations|digital|risk|people
  */
-export async function GET(request: Request) {
+export const GET = withAuth('consultants', async (request) => {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status') || 'active';
   const practiceArea = searchParams.get('practiceArea');
@@ -28,14 +29,14 @@ export async function GET(request: Request) {
   });
 
   return Response.json(consultants.map(toConsultantDTO));
-}
+});
 
 /**
  * POST /api/consultants
- * Create a new consultant.
+ * Create a new consultant. Requires partner role.
  * Body: { name, role, practice_area, seniority_level, skills: string[], avatar_url }
  */
-export async function POST(request: Request) {
+export const POST = withAuth('consultants', async (request) => {
   const body = await request.json();
   const { skills, ...rest } = body;
 
@@ -65,4 +66,4 @@ export async function POST(request: Request) {
   });
 
   return Response.json(toConsultantDTO(consultant), { status: 201 });
-}
+});

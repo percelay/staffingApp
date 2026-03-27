@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { toAssignmentDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
  * Returns assignments, optionally filtered.
  * Query params: ?consultantId=xxx  &engagementId=xxx
  */
-export async function GET(request: Request) {
+export const GET = withAuth('assignments', async (request) => {
   const { searchParams } = new URL(request.url);
   const consultantId = searchParams.get('consultantId');
   const engagementId = searchParams.get('engagementId');
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   });
 
   return Response.json(assignments.map(toAssignmentDTO));
-}
+});
 
 /**
  * POST /api/assignments
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
  * Utilization is automatically computed as the sum of allocation_percentage
  * across all active assignments for a consultant.
  */
-export async function POST(request: Request) {
+export const POST = withAuth('assignments', async (request) => {
   try {
     const body = await request.json();
 
@@ -61,4 +62,4 @@ export async function POST(request: Request) {
     console.error('[POST /api/assignments]', err);
     return Response.json({ error: 'Failed to create assignment' }, { status: 500 });
   }
-}
+});

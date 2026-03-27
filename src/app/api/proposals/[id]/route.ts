@@ -1,15 +1,12 @@
-import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
+import { withAuth } from '@/lib/api/rbac';
 
 /**
  * GET /api/proposals/:id
  * Returns a single proposal with slots.
  */
-export async function GET(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/proposals/[id]'>
-) {
-  const { id } = await ctx.params;
+export const GET = withAuth('proposals', async (request) => {
+  const id = request.url.split('/api/proposals/')[1]?.split('/')[0]?.split('?')[0];
 
   const proposal = await prisma.proposal.findUnique({
     where: { id },
@@ -34,4 +31,4 @@ export async function GET(
       required: s.required,
     })),
   });
-}
+});

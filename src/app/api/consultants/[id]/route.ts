@@ -1,16 +1,13 @@
-import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { toConsultantDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 /**
  * GET /api/consultants/:id
  * Returns a single consultant with skills.
  */
-export async function GET(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/consultants/[id]'>
-) {
-  const { id } = await ctx.params;
+export const GET = withAuth('consultants', async (request) => {
+  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
 
   const consultant = await prisma.consultant.findUnique({
     where: { id },
@@ -22,18 +19,15 @@ export async function GET(
   }
 
   return Response.json(toConsultantDTO(consultant));
-}
+});
 
 /**
  * PATCH /api/consultants/:id
  * Update consultant fields (name, role, seniority_level, practice_area, etc.)
  * Body: partial Consultant fields in snake_case
  */
-export async function PATCH(
-  request: NextRequest,
-  ctx: RouteContext<'/api/consultants/[id]'>
-) {
-  const { id } = await ctx.params;
+export const PATCH = withAuth('consultants', async (request) => {
+  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
   const body = await request.json();
 
   // Map snake_case input to camelCase Prisma fields
@@ -53,18 +47,15 @@ export async function PATCH(
   });
 
   return Response.json(toConsultantDTO(consultant));
-}
+});
 
 /**
  * DELETE /api/consultants/:id
- * Soft-deletes a consultant (sets status to 'departed').
+ * Soft-deletes a consultant (sets status to 'departed'). Requires partner role.
  * Historical assignment data is preserved.
  */
-export async function DELETE(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/consultants/[id]'>
-) {
-  const { id } = await ctx.params;
+export const DELETE = withAuth('consultants', async (request) => {
+  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
 
   const consultant = await prisma.consultant.update({
     where: { id },
@@ -73,4 +64,4 @@ export async function DELETE(
   });
 
   return Response.json(toConsultantDTO(consultant));
-}
+});
