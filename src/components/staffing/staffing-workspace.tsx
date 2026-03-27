@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { format, addWeeks, startOfWeek, parseISO, differenceInWeeks } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,13 +20,15 @@ import {
   getCurrentConsultantUtilization,
 } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getWeeklyAllocations } from '@/lib/utils/availability';
+import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
 import { getStatusColor } from '@/lib/utils/colors';
+import { datesOverlap, getWeekLabel, isWithinRange } from '@/lib/utils/date-helpers';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
 import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
 import type { Assignment, AssignmentRole } from '@/lib/types/assignment';
 import type { WellbeingSignal } from '@/lib/types/wellbeing';
+import { cn } from '@/lib/utils';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -186,6 +189,7 @@ export function StaffingWorkspace() {
         {selectedEngagement ? (
           <EngagementDetail
             engagement={selectedEngagement}
+            allEngagements={engagements}
             engAssignments={assignments.filter((a) => a.engagement_id === selectedEngagement.id)}
             allAssignments={assignments}
             consultants={consultants}
@@ -222,6 +226,7 @@ export function StaffingWorkspace() {
 
 interface DetailProps {
   engagement: Engagement;
+  allEngagements: Engagement[];
   engAssignments: Assignment[];
   allAssignments: Assignment[];
   consultants: Consultant[];
@@ -234,12 +239,13 @@ interface DetailProps {
 }
 
 function EngagementDetail({
-  engagement, engAssignments, allAssignments, consultants, signals,
+  engagement, allEngagements, engAssignments, allAssignments, consultants, signals,
   onUpdate, onDelete, onCreateAssignment, onUpdateAssignment, onRemoveAssignment,
 }: DetailProps) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
+  const [expandedConsultantId, setExpandedConsultantId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [clientName, setClientName] = useState(engagement.client_name);
@@ -270,6 +276,7 @@ function EngagementDetail({
     setEditing(false);
     setConfirmDelete(false);
     setAddingMember(false);
+    setExpandedConsultantId(null);
   }
 
   const assignedIds = new Set(engAssignments.map((a) => a.consultant_id));
@@ -446,7 +453,16 @@ function EngagementDetail({
                 Team effort: {formatAllocationAsManDays(totalAllocation)}
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setAddingMember(!addingMember)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (addingMember) {
+                  setExpandedConsultantId(null);
+                }
+                setAddingMember(!addingMember);
+              }}
+            >
               {addingMember ? 'Cancel' : '+ Add Consultant'}
             </Button>
           </div>
@@ -469,53 +485,23 @@ function EngagementDetail({
                 {availableConsultants.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">No consultants available</p>
                 ) : (
-                  availableConsultants.map((c) => {
-                    const isSelected = newConsultantId === c.id;
-                    const skillMatch = getConsultantMatches(c.skills, engagement.required_skills);
-                    const goalMatch = getConsultantMatches(c.goals, engagement.required_skills);
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setNewConsultantId(isSelected ? '' : c.id)}
-                        className={`w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors ${
-                          isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm font-medium truncate">{c.name}</span>
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {SENIORITY_LABELS[c.seniority_level as keyof typeof SENIORITY_LABELS]}
-                            </span>
-                          </div>
-                        </div>
-                        {engagement.required_skills.length > 0 && (
-                          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                            <MatchIndicator
-                              label="Skill"
-                              count={skillMatch.length}
-                              tone="emerald"
-                              titleWhenActive={`${skillMatch.length} current skill${skillMatch.length === 1 ? '' : 's'} match project requirements`}
-                              titleWhenInactive="No current skills match project requirements"
-                            />
-                            <MatchIndicator
-                              label="Goal"
-                              count={goalMatch.length}
-                              tone="sky"
-                              titleWhenActive={`${goalMatch.length} developmental goal${goalMatch.length === 1 ? '' : 's'} match project requirements`}
-                              titleWhenInactive="No developmental goals match project requirements"
-                            />
-                          </div>
-                        )}
-                        <AvailabilityBar
-                          consultantId={c.id}
-                          allAssignments={allAssignments}
-                          engStart={engagement.start_date}
-                          engEnd={engagement.end_date}
-                        />
-                      </button>
-                    );
-                  })
+                  availableConsultants.map((consultant) => (
+                    <AvailableConsultantCard
+                      key={consultant.id}
+                      consultant={consultant}
+                      engagement={engagement}
+                      allAssignments={allAssignments}
+                      allEngagements={allEngagements}
+                      isSelected={newConsultantId === consultant.id}
+                      isExpanded={expandedConsultantId === consultant.id}
+                      onSelect={() => {
+                        setNewConsultantId((currentId) => currentId === consultant.id ? '' : consultant.id);
+                      }}
+                      onToggleExpand={() => {
+                        setExpandedConsultantId((currentId) => currentId === consultant.id ? null : consultant.id);
+                      }}
+                    />
+                  ))
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -573,6 +559,496 @@ function EngagementDetail({
         </div>
       </div>
     </ScrollArea>
+  );
+}
+
+function AvailableConsultantCard({
+  consultant,
+  engagement,
+  allAssignments,
+  allEngagements,
+  isSelected,
+  isExpanded,
+  onSelect,
+  onToggleExpand,
+}: {
+  consultant: Consultant;
+  engagement: Engagement;
+  allAssignments: Assignment[];
+  allEngagements: Engagement[];
+  isSelected: boolean;
+  isExpanded: boolean;
+  onSelect: () => void;
+  onToggleExpand: () => void;
+}) {
+  const skillMatch = getConsultantMatches(consultant.skills, engagement.required_skills);
+  const goalMatch = getConsultantMatches(consultant.goals, engagement.required_skills);
+
+  return (
+    <div
+      className={cn(
+        'border-b last:border-b-0 transition-colors',
+        isSelected
+          ? 'border-l-2 border-l-primary bg-primary/5'
+          : isExpanded
+            ? 'bg-slate-50/90'
+            : 'hover:bg-slate-50'
+      )}
+    >
+      <div className="flex items-start gap-2 px-3 py-2.5">
+        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium truncate">{consultant.name}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {SENIORITY_LABELS[consultant.seniority_level as keyof typeof SENIORITY_LABELS]}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground shrink-0">
+              {PRACTICE_AREA_LABELS[consultant.practice_area]}
+            </span>
+          </div>
+          {engagement.required_skills.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <MatchIndicator
+                label="Skill"
+                count={skillMatch.length}
+                tone="emerald"
+                titleWhenActive={`${skillMatch.length} current skill${skillMatch.length === 1 ? '' : 's'} match project requirements`}
+                titleWhenInactive="No current skills match project requirements"
+              />
+              <MatchIndicator
+                label="Goal"
+                count={goalMatch.length}
+                tone="sky"
+                titleWhenActive={`${goalMatch.length} developmental goal${goalMatch.length === 1 ? '' : 's'} match project requirements`}
+                titleWhenInactive="No developmental goals match project requirements"
+              />
+            </div>
+          )}
+          <AvailabilityBar
+            consultantId={consultant.id}
+            allAssignments={allAssignments}
+            engStart={engagement.start_date}
+            engEnd={engagement.end_date}
+          />
+        </button>
+
+        <Button
+          type="button"
+          variant={isExpanded ? 'secondary' : 'ghost'}
+          size="xs"
+          aria-expanded={isExpanded}
+          className="mt-0.5 shrink-0"
+          onClick={onToggleExpand}
+        >
+          {isExpanded ? 'Hide' : 'Expand'}
+          {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+        </Button>
+      </div>
+
+      {isExpanded && (
+        <div className="border-t border-slate-200 bg-white/80 px-3 pb-3 pt-3">
+          <ExpandedConsultantDetail
+            consultant={consultant}
+            engagement={engagement}
+            allAssignments={allAssignments}
+            allEngagements={allEngagements}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExpandedConsultantDetail({
+  consultant,
+  engagement,
+  allAssignments,
+  allEngagements,
+}: {
+  consultant: Consultant;
+  engagement: Engagement;
+  allAssignments: Assignment[];
+  allEngagements: Engagement[];
+}) {
+  const periodStart = engagement.start_date;
+  const periodEnd = engagement.end_date;
+
+  const timelineWeeks = useMemo(
+    () => getWeeklyAllocations(consultant.id, allAssignments, parseISO(periodStart), parseISO(periodEnd)),
+    [consultant.id, allAssignments, periodStart, periodEnd]
+  );
+
+  const overlappingAssignments = useMemo(() => {
+    return allAssignments
+      .filter(
+        (assignment) =>
+          assignment.consultant_id === consultant.id &&
+          assignment.engagement_id !== engagement.id &&
+          datesOverlap(assignment.start_date, assignment.end_date, periodStart, periodEnd)
+      )
+      .map((assignment) => ({
+        assignment,
+        relatedEngagement:
+          allEngagements.find((candidate) => candidate.id === assignment.engagement_id) ?? null,
+      }))
+      .sort((a, b) => a.assignment.start_date.localeCompare(b.assignment.start_date));
+  }, [allAssignments, allEngagements, consultant.id, engagement.id, periodEnd, periodStart]);
+
+  const averageAvailability = Math.round(
+    getAverageAvailability(consultant.id, allAssignments, parseISO(periodStart), parseISO(periodEnd))
+  );
+  const peakLoad = timelineWeeks.reduce((max, week) => Math.max(max, week.allocation), 0);
+  const busyWeeks = timelineWeeks.filter((week) => week.allocation > 0).length;
+
+  const projectRequirements = engagement.required_skills.map((skill) => ({
+    skill,
+    hasSkill: hasNormalizedValue(consultant.skills, skill),
+    hasGoal: hasNormalizedValue(consultant.goals, skill),
+  }));
+
+  const timelineColumns = `minmax(180px, 240px) repeat(${Math.max(timelineWeeks.length, 1)}, minmax(52px, 1fr))`;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <DetailMetricCard
+          label="Other projects"
+          value={String(overlappingAssignments.length)}
+          detail={
+            overlappingAssignments.length === 0
+              ? 'Fully open in this window'
+              : `${busyWeeks}/${timelineWeeks.length} weeks already staffed`
+          }
+        />
+        <DetailMetricCard
+          label="Peak weekly load"
+          value={`${peakLoad}%`}
+          detail={peakLoad > 100 ? 'Overbooked at peak' : 'Highest committed week'}
+        />
+        <DetailMetricCard
+          label="Average availability"
+          value={`${averageAvailability}%`}
+          detail={`${format(parseISO(periodStart), 'MMM d')} - ${format(parseISO(periodEnd), 'MMM d')}`}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Project-Period Timeline
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Showing other commitments that overlap {engagement.project_name}
+            </p>
+          </div>
+          <Badge variant="outline" className="text-[10px]">
+            {timelineWeeks.length} week{timelineWeeks.length === 1 ? '' : 's'}
+          </Badge>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border bg-white">
+          <div className="min-w-max">
+            <div className="grid gap-px bg-slate-200" style={{ gridTemplateColumns: timelineColumns }}>
+              <TimelineHeaderCell>Week of</TimelineHeaderCell>
+              {timelineWeeks.map((week) => (
+                <TimelineHeaderCell key={week.weekStart.toISOString()}>
+                  {getWeekLabel(week.weekStart)}
+                </TimelineHeaderCell>
+              ))}
+
+              <TimelineLabelCell
+                title="Total load"
+                subtitle={overlappingAssignments.length === 0 ? 'Open for the full project window' : 'Combined load across other work'}
+              />
+              {timelineWeeks.map((week) => (
+                <TimelineLoadCell key={`total-${week.weekStart.toISOString()}`} allocation={week.allocation} />
+              ))}
+
+              {overlappingAssignments.map(({ assignment, relatedEngagement }) => (
+                <TimelineAssignmentRow
+                  key={assignment.id}
+                  assignment={assignment}
+                  relatedEngagement={relatedEngagement}
+                  timelineWeeks={timelineWeeks}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {overlappingAssignments.length === 0 && (
+          <p className="text-[11px] text-emerald-700">
+            No other projects overlap this period, so this consultant is fully open throughout the engagement window.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Project Fit
+          </p>
+          <MatchLegend label="Skill match" tone="emerald" />
+          <MatchLegend label="Goal match" tone="sky" />
+          <MatchLegend label="Gap" tone="slate" />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {projectRequirements.length > 0 ? (
+            projectRequirements.map(({ skill, hasSkill, hasGoal }) => (
+              <ProjectRequirementPill key={skill} skill={skill} hasSkill={hasSkill} hasGoal={hasGoal} />
+            ))
+          ) : (
+            <span className="text-[11px] text-muted-foreground">
+              No required skills are defined for this project yet.
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ConsultantFocusList
+          title="Current Skills"
+          items={consultant.skills}
+          requiredSkills={engagement.required_skills}
+          tone="emerald"
+          emptyMessage="No current skills listed"
+        />
+        <ConsultantFocusList
+          title="Development Goals"
+          items={consultant.goals}
+          requiredSkills={engagement.required_skills}
+          tone="sky"
+          emptyMessage="No developmental goals listed"
+        />
+      </div>
+    </div>
+  );
+}
+
+function DetailMetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-slate-50/80 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold tracking-tight">{value}</p>
+      <p className="text-[11px] text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function TimelineAssignmentRow({
+  assignment,
+  relatedEngagement,
+  timelineWeeks,
+}: {
+  assignment: Assignment;
+  relatedEngagement: Engagement | null;
+  timelineWeeks: ReturnType<typeof getWeeklyAllocations>;
+}) {
+  return (
+    <>
+      <TimelineLabelCell
+        title={relatedEngagement?.client_name ?? 'Unknown project'}
+        subtitle={`${relatedEngagement?.project_name ?? 'Project details unavailable'} • ${assignment.role} • ${assignment.allocation_percentage}%`}
+        color={relatedEngagement?.color}
+      />
+      {timelineWeeks.map((week) => (
+        <TimelineAssignmentCell
+          key={`${assignment.id}-${week.weekStart.toISOString()}`}
+          active={isWeekAllocated(week.weekStart, assignment)}
+          allocation={assignment.allocation_percentage}
+          color={relatedEngagement?.color ?? '#94A3B8'}
+        />
+      ))}
+    </>
+  );
+}
+
+function TimelineHeaderCell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-50 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function TimelineLabelCell({
+  title,
+  subtitle,
+  color,
+}: {
+  title: string;
+  subtitle: string;
+  color?: string;
+}) {
+  return (
+    <div className="bg-white px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        {color && <span className="mt-1.5 h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />}
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-slate-900">{title}</p>
+          <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelineLoadCell({ allocation }: { allocation: number }) {
+  return (
+    <div className="bg-white p-1.5">
+      <div
+        className={cn(
+          'flex min-h-10 items-center justify-center rounded-md border text-[10px] font-semibold',
+          allocation === 0
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : allocation >= 100
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-amber-200 bg-amber-50 text-amber-700'
+        )}
+      >
+        {allocation === 0 ? 'Open' : `${allocation}%`}
+      </div>
+    </div>
+  );
+}
+
+function TimelineAssignmentCell({
+  active,
+  allocation,
+  color,
+}: {
+  active: boolean;
+  allocation: number;
+  color: string;
+}) {
+  return (
+    <div className="bg-white p-1.5">
+      <div
+        className={cn(
+          'flex min-h-10 items-center justify-center rounded-md border text-[10px] font-medium',
+          active ? 'text-slate-700' : 'border-dashed border-slate-200 bg-slate-50 text-slate-300'
+        )}
+        style={active ? { backgroundColor: withAlpha(color, 0.14), borderColor: withAlpha(color, 0.32) } : undefined}
+      >
+        {active ? `${allocation}%` : '—'}
+      </div>
+    </div>
+  );
+}
+
+function MatchLegend({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'emerald' | 'sky' | 'slate';
+}) {
+  const dotClass =
+    tone === 'emerald'
+      ? 'bg-emerald-500'
+      : tone === 'sky'
+        ? 'bg-sky-500'
+        : 'bg-slate-300';
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <span className={cn('h-2 w-2 rounded-full', dotClass)} />
+      {label}
+    </span>
+  );
+}
+
+function ProjectRequirementPill({
+  skill,
+  hasSkill,
+  hasGoal,
+}: {
+  skill: string;
+  hasSkill: boolean;
+  hasGoal: boolean;
+}) {
+  const stateClass = hasSkill
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : hasGoal
+      ? 'border-sky-200 bg-sky-50 text-sky-700'
+      : 'border-slate-200 bg-slate-50 text-slate-500';
+
+  const label = hasSkill ? 'Current skill' : hasGoal ? 'Development goal' : 'Gap';
+
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium', stateClass)}>
+      <span>{skill}</span>
+      <span className="text-[10px] opacity-80">{label}</span>
+    </span>
+  );
+}
+
+function ConsultantFocusList({
+  title,
+  items,
+  requiredSkills,
+  tone,
+  emptyMessage,
+}: {
+  title: string;
+  items: string[];
+  requiredSkills: string[];
+  tone: 'emerald' | 'sky';
+  emptyMessage: string;
+}) {
+  const matches = getConsultantMatches(items, requiredSkills);
+
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {matches.length} match{matches.length === 1 ? '' : 'es'} for this project
+          </p>
+        </div>
+        <MatchIndicator
+          label={tone === 'emerald' ? 'Skill' : 'Goal'}
+          count={matches.length}
+          tone={tone}
+          titleWhenActive={`${matches.length} ${title.toLowerCase()} match project requirements`}
+          titleWhenInactive={`No ${title.toLowerCase()} match project requirements`}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <span
+              key={item}
+              className={cn(
+                'inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium',
+                hasNormalizedValue(requiredSkills, item)
+                  ? tone === 'emerald'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-sky-200 bg-sky-50 text-sky-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-600'
+              )}
+            >
+              {item}
+            </span>
+          ))
+        ) : (
+          <span className="text-[11px] text-muted-foreground">{emptyMessage}</span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -696,8 +1172,37 @@ function MatchIndicator({
 function getConsultantMatches(source: string[], requiredSkills: string[]) {
   if (source.length === 0 || requiredSkills.length === 0) return [];
 
-  const required = new Set(requiredSkills.map((skill) => skill.trim().toLowerCase()));
-  return source.filter((item) => required.has(item.trim().toLowerCase()));
+  const required = new Set(requiredSkills.map(normalizeSkillName));
+  return source.filter((item) => required.has(normalizeSkillName(item)));
+}
+
+function hasNormalizedValue(source: string[], candidate: string) {
+  const normalizedCandidate = normalizeSkillName(candidate);
+  return source.some((item) => normalizeSkillName(item) === normalizedCandidate);
+}
+
+function normalizeSkillName(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isWeekAllocated(weekStart: Date, assignment: Assignment) {
+  return isWithinRange(
+    weekStart,
+    parseISO(assignment.start_date),
+    parseISO(assignment.end_date)
+  );
+}
+
+function withAlpha(hexColor: string, alpha: number) {
+  const safeHex = hexColor.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(safeHex)) {
+    return `rgba(148, 163, 184, ${alpha})`;
+  }
+
+  const r = Number.parseInt(safeHex.slice(0, 2), 16);
+  const g = Number.parseInt(safeHex.slice(2, 4), 16);
+  const b = Number.parseInt(safeHex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // ─── Availability Bar ────────────────────────────────────────────────────────
