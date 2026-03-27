@@ -8,7 +8,10 @@
  */
 
 import type { Consultant } from '../types/consultant';
-import type { Engagement } from '../types/engagement';
+import {
+  normalizeEngagementStatus,
+  type Engagement,
+} from '../types/engagement';
 import type { Assignment } from '../types/assignment';
 import type { WellbeingSignal } from '../types/wellbeing';
 
@@ -85,7 +88,7 @@ export function toEngagementDTO(p: PrismaEngagementWithSkills): Engagement {
     start_date: formatDate(p.startDate),
     end_date: formatDate(p.endDate),
     required_skills: p.requiredSkills.map((es) => es.skill.name),
-    status: p.status as Engagement['status'],
+    status: normalizeEngagementStatus(p.status),
     color: p.color,
   };
 }

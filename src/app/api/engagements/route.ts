@@ -1,13 +1,14 @@
 import { prisma } from '@/lib/db';
 import { toEngagementDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
+import { normalizeEngagementStatus } from '@/lib/types/engagement';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/engagements
  * Returns all engagements with required skills flattened.
- * Query params: ?status=active|upcoming|completed|at_risk
+ * Query params: ?status=active|upcoming|completed
  */
 export const GET = withAuth('engagements', async (request) => {
   const { searchParams } = new URL(request.url);
@@ -15,7 +16,7 @@ export const GET = withAuth('engagements', async (request) => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
-  if (status) where.status = status;
+  if (status) where.status = normalizeEngagementStatus(status);
 
   const engagements = await prisma.engagement.findMany({
     where,
@@ -43,7 +44,7 @@ export const POST = withAuth('engagements', async (request) => {
       projectName: rest.project_name,
       startDate: new Date(rest.start_date),
       endDate: new Date(rest.end_date),
-      status: rest.status || 'upcoming',
+      status: rest.status ? normalizeEngagementStatus(rest.status) : 'upcoming',
       color: rest.color || '#4F46E5',
       requiredSkills: {
         create: (required_skills || []).map((skillName: string) => ({

@@ -20,7 +20,11 @@ import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { SENIORITY_ORDER, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant } from '@/lib/types/consultant';
 import type { Assignment } from '@/lib/types/assignment';
-import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
+import {
+  ENGAGEMENT_STATUS_LABELS,
+  type Engagement,
+  type EngagementStatus,
+} from '@/lib/types/engagement';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -40,17 +44,9 @@ const BASE_BLOCK_HEIGHT = BASE_LANE_HEIGHT - BLOCK_PADDING * 2;
 const EFFORT_METER_SEGMENTS = 5;
 
 const ENGAGEMENT_STATUS_ORDER: Record<EngagementStatus, number> = {
-  at_risk: 0,
-  active: 1,
-  upcoming: 2,
-  completed: 3,
-};
-
-const ENGAGEMENT_STATUS_LABELS: Record<EngagementStatus, string> = {
-  at_risk: 'At Risk',
-  active: 'Active',
-  upcoming: 'Upcoming',
-  completed: 'Completed',
+  active: 0,
+  upcoming: 1,
+  completed: 2,
 };
 
 type TimelineViewMode = 'consultants' | 'projects';
@@ -667,49 +663,6 @@ export function SwimLaneChart() {
         const laneHeight = laneLayout.height;
 
         if (lane.consultantId) {
-          const burnoutScore = burnoutByConsultantId.get(lane.consultantId) || 0;
-
-          if (burnoutScore > 30) {
-            const baseIntensity = Math.min(0.15, (burnoutScore / 100) * 0.18);
-            svg
-              .append('rect')
-              .attr('x', 0)
-              .attr('y', laneY)
-              .attr('width', chartWidth)
-              .attr('height', laneHeight)
-              .attr('fill', `rgba(239, 68, 68, ${baseIntensity})`)
-              .attr('pointer-events', 'none');
-
-            const burnoutAllocations = getWeeklyAllocations(
-              lane.consultantId,
-              visibleAssignments,
-              start,
-              end
-            );
-
-            for (const allocation of burnoutAllocations) {
-              if (allocation.allocation <= 80) {
-                continue;
-              }
-
-              const weekX = xScale(allocation.weekStart);
-              const weekWidth = chartWidth / weeks.length;
-              const weekIntensity = Math.min(
-                0.12,
-                ((allocation.allocation - 80) / 100) * 0.15
-              );
-
-              svg
-                .append('rect')
-                .attr('x', weekX)
-                .attr('y', laneY)
-                .attr('width', weekWidth)
-                .attr('height', laneHeight)
-                .attr('fill', `rgba(239, 68, 68, ${weekIntensity})`)
-                .attr('pointer-events', 'none');
-            }
-          }
-
           const allocations = getWeeklyAllocations(
             lane.consultantId,
             visibleAssignments,
@@ -919,7 +872,6 @@ export function SwimLaneChart() {
       }
     }
   }, [
-    burnoutByConsultantId,
     chartWidth,
     consultantById,
     engagementById,

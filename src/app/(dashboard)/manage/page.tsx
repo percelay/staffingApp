@@ -15,27 +15,18 @@ import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor } from '@/lib/utils/colors';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { PracticeArea, SeniorityLevel } from '@/lib/types/consultant';
-import type { EngagementStatus } from '@/lib/types/engagement';
+import {
+  ENGAGEMENT_STATUS_DOT_CLASSES,
+  ENGAGEMENT_STATUS_LABELS,
+  ENGAGEMENT_STATUS_OPTIONS,
+  type EngagementStatus,
+} from '@/lib/types/engagement';
 import { ConsultantEditSheet } from '@/components/manage/consultant-edit-sheet';
 import { ConsultantAddDialog } from '@/components/manage/consultant-add-dialog';
 import { EngagementEditSheet } from '@/components/manage/engagement-edit-sheet';
 import { EngagementAddDialog } from '@/components/manage/engagement-add-dialog';
 
 type Tab = 'people' | 'engagements';
-
-const STATUS_COLORS: Record<EngagementStatus, string> = {
-  active: 'bg-green-500',
-  upcoming: 'bg-blue-500',
-  at_risk: 'bg-red-500',
-  completed: 'bg-gray-400',
-};
-
-const STATUS_LABELS: Record<EngagementStatus, string> = {
-  active: 'Active',
-  upcoming: 'Upcoming',
-  at_risk: 'At Risk',
-  completed: 'Completed',
-};
 
 export default function ManagePage() {
   const consultants = useConsultantStore((s) => s.consultants);
@@ -170,10 +161,11 @@ export default function ManagePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="at_risk">At Risk</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                {ENGAGEMENT_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           )}
@@ -267,8 +259,8 @@ export default function ManagePage() {
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">{engagement.client_name}</p>
                           <Badge variant="secondary" className="text-[10px]">
-                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${STATUS_COLORS[engagement.status]}`} />
-                            {STATUS_LABELS[engagement.status]}
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${ENGAGEMENT_STATUS_DOT_CLASSES[engagement.status]}`} />
+                            {ENGAGEMENT_STATUS_LABELS[engagement.status]}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-3 mt-1">

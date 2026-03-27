@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { parseISO } from 'date-fns';
 import { authFetch } from '../api/auth-fetch';
-import type { Engagement } from '../types';
+import { normalizeEngagementStatus, type Engagement } from '../types';
 import { datesOverlap } from '../utils/date-helpers';
 
 interface EngagementStore {
@@ -27,7 +27,13 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
   engagements: [],
   loading: false,
 
-  setEngagements: (engagements) => set({ engagements }),
+  setEngagements: (engagements) =>
+    set({
+      engagements: engagements.map((engagement) => ({
+        ...engagement,
+        status: normalizeEngagementStatus(engagement.status),
+      })),
+    }),
 
   fetchEngagements: async () => {
     set({ loading: true });
@@ -66,7 +72,11 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
       // API unavailable — fall through to local-only creation
     }
     // Fallback: add to local store without DB persistence
-    const local: Engagement = { ...data, id: crypto.randomUUID() };
+    const local: Engagement = {
+      ...data,
+      id: crypto.randomUUID(),
+      status: normalizeEngagementStatus(data.status),
+    };
     set((s) => ({ engagements: [...s.engagements, local] }));
     return local;
   },
@@ -89,7 +99,18 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
       // API unavailable — fall through to local-only update
     }
     set((s) => ({
-      engagements: s.engagements.map((e) => (e.id === id ? { ...e, ...data } as Engagement : e)),
+      engagements: s.engagements.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              ...data,
+              status:
+                data.status !== undefined
+                  ? normalizeEngagementStatus(data.status)
+                  : e.status,
+            } as Engagement
+          : e
+      ),
     }));
   },
 

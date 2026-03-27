@@ -25,7 +25,12 @@ import { getStatusColor } from '@/lib/utils/colors';
 import { datesOverlap, getWeekLabel, isWithinRange } from '@/lib/utils/date-helpers';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
-import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
+import {
+  ENGAGEMENT_STATUS_LABELS,
+  ENGAGEMENT_STATUS_OPTIONS,
+  type Engagement,
+  type EngagementStatus,
+} from '@/lib/types/engagement';
 import type { Assignment, AssignmentRole } from '@/lib/types/assignment';
 import type { WellbeingSignal } from '@/lib/types/wellbeing';
 import { cn } from '@/lib/utils';
@@ -38,13 +43,6 @@ const ALL_SKILLS = [
   'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
   'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
   'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
-
-const STATUS_OPTIONS: { value: EngagementStatus; label: string; dot: string }[] = [
-  { value: 'active', label: 'Active', dot: 'bg-green-500' },
-  { value: 'upcoming', label: 'Upcoming', dot: 'bg-blue-500' },
-  { value: 'at_risk', label: 'At Risk', dot: 'bg-red-500' },
-  { value: 'completed', label: 'Completed', dot: 'bg-gray-400' },
 ];
 
 const COLOR_PALETTE = [
@@ -91,7 +89,11 @@ export function StaffingWorkspace() {
           e.project_name.toLowerCase().includes(q)
       );
     }
-    const order: Record<string, number> = { active: 0, at_risk: 1, upcoming: 2, completed: 3 };
+    const order: Record<EngagementStatus, number> = {
+      active: 0,
+      upcoming: 1,
+      completed: 2,
+    };
     list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
     return list;
   }, [engagements, statusFilter, searchQuery]);
@@ -122,10 +124,10 @@ export function StaffingWorkspace() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              {STATUS_OPTIONS.map((s) => (
+              {ENGAGEMENT_STATUS_OPTIONS.map((s) => (
                 <SelectItem key={s.value} value={s.value}>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${s.dot}`} />
+                    <div className={`w-2 h-2 rounded-full ${s.dotClass}`} />
                     {s.label}
                   </div>
                 </SelectItem>
@@ -160,7 +162,7 @@ export function StaffingWorkspace() {
                       <p className="text-xs text-muted-foreground truncate">{eng.project_name}</p>
                       <div className="flex items-center gap-2 mt-1.5">
                         <Badge variant="outline" className="text-[10px] capitalize">
-                          {eng.status.replace('_', ' ')}
+                          {ENGAGEMENT_STATUS_LABELS[eng.status]}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground">
                           {teamCount} member{teamCount !== 1 ? 's' : ''}
@@ -380,15 +382,15 @@ function EngagementDetail({
               <Select value={status} onValueChange={(v) => setStatus(v as EngagementStatus)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
+                  {ENGAGEMENT_STATUS_OPTIONS.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
-                      <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${s.dot}`} />{s.label}</div>
+                      <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${s.dotClass}`} />{s.label}</div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             ) : (
-              <Badge variant="outline" className="capitalize text-xs">{engagement.status.replace('_', ' ')}</Badge>
+              <Badge variant="outline" className="capitalize text-xs">{ENGAGEMENT_STATUS_LABELS[engagement.status]}</Badge>
             )}
           </AttrCard>
           <AttrCard label="Start Date">
@@ -1358,7 +1360,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
               <Select value={status} onValueChange={(v) => setStatus(v as EngagementStatus)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (<SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>))}
+                  {ENGAGEMENT_STATUS_OPTIONS.map((s) => (<SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>

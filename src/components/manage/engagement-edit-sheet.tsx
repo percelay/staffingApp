@@ -11,7 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
-import type { Engagement, EngagementStatus } from '@/lib/types/engagement';
+import {
+  ENGAGEMENT_STATUS_OPTIONS,
+  type Engagement,
+  type EngagementStatus,
+} from '@/lib/types/engagement';
 import type { AssignmentRole } from '@/lib/types/assignment';
 
 const ALL_SKILLS = [
@@ -20,13 +24,6 @@ const ALL_SKILLS = [
   'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
   'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
   'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
-
-const STATUS_OPTIONS: { value: EngagementStatus; label: string; color: string }[] = [
-  { value: 'active', label: 'Active', color: 'bg-green-500' },
-  { value: 'upcoming', label: 'Upcoming', color: 'bg-blue-500' },
-  { value: 'completed', label: 'Completed', color: 'bg-gray-400' },
-  { value: 'at_risk', label: 'At Risk', color: 'bg-red-500' },
 ];
 
 const COLOR_OPTIONS = [
@@ -200,10 +197,10 @@ export function EngagementEditSheet({ engagement, open, onOpenChange }: Engageme
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((opt) => (
+                  {ENGAGEMENT_STATUS_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${opt.color}`} />
+                        <div className={`w-2 h-2 rounded-full ${opt.dotClass}`} />
                         {opt.label}
                       </div>
                     </SelectItem>

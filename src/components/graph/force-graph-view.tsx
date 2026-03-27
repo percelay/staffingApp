@@ -15,6 +15,7 @@ import { formatAllocationAsManDays } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor, getSenioritySize } from '@/lib/utils/colors';
 import { SENIORITY_LABELS } from '@/lib/types/consultant';
+import { ENGAGEMENT_STATUS_LABELS } from '@/lib/types/engagement';
 
 interface GraphNode {
   id: string;
@@ -367,7 +368,7 @@ export default function ForceGraphView() {
               Status
             </p>
             <Badge variant="secondary" className="mt-1 capitalize">
-              {e.status.replace('_', ' ')}
+              {ENGAGEMENT_STATUS_LABELS[e.status]}
             </Badge>
           </div>
           <Separator />

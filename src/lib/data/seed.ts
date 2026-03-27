@@ -105,7 +105,7 @@ function generateEngagements(): Engagement[] {
       start_date: format(start, 'yyyy-MM-dd'),
       end_date: format(end, 'yyyy-MM-dd'),
       required_skills: requiredSkills,
-      status: i === 4 ? 'at_risk' : isNearEnd ? 'completed' : isStarted ? 'active' : 'upcoming',
+      status: isNearEnd ? 'completed' : isStarted ? 'active' : 'upcoming',
       color: CLIENT_COLORS[i % CLIENT_COLORS.length],
     });
   }
@@ -181,7 +181,7 @@ function generateAssignments(
     });
   }
 
-  // Engagement 5 (Pinnacle Energy - at_risk): 5 people, consultant-2 is now on 3 engagements (burnout)
+  // Engagement 5 (Pinnacle Energy): 5 people, consultant-2 is now on 3 engagements (burnout)
   const e5Team = [0, 4, 9, 14, 17];
   const e5Roles: AssignmentRole[] = ['lead', 'manager', 'consultant', 'consultant', 'analyst'];
   for (let j = 0; j < e5Team.length; j++) {

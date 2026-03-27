@@ -15,7 +15,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
-import type { EngagementStatus } from '@/lib/types/engagement';
+import {
+  ENGAGEMENT_STATUS_OPTIONS,
+  type EngagementStatus,
+} from '@/lib/types/engagement';
 
 const ALL_SKILLS = [
   'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
@@ -125,10 +128,11 @@ export function EngagementAddDialog({ open, onOpenChange }: EngagementAddDialogP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="at_risk">At Risk</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  {ENGAGEMENT_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

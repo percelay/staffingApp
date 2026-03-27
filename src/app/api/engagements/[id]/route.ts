@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { toEngagementDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
+import { normalizeEngagementStatus } from '@/lib/types/engagement';
 
 /**
  * GET /api/engagements/:id
@@ -55,7 +56,7 @@ export const PATCH = withAuth('engagements', async (request) => {
   if (body.project_name !== undefined) data.projectName = body.project_name;
   if (body.start_date !== undefined) data.startDate = new Date(body.start_date);
   if (body.end_date !== undefined) data.endDate = new Date(body.end_date);
-  if (body.status !== undefined) data.status = body.status;
+  if (body.status !== undefined) data.status = normalizeEngagementStatus(body.status);
   if (body.color !== undefined) data.color = body.color;
 
   // Only run update if there are scalar changes

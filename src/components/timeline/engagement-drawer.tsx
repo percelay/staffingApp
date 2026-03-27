@@ -25,14 +25,11 @@ import {
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/colors';
 import { SENIORITY_LABELS } from '@/lib/types/consultant';
+import {
+  ENGAGEMENT_STATUS_BADGE_CLASSES,
+  ENGAGEMENT_STATUS_LABELS,
+} from '@/lib/types/engagement';
 import { format, parseISO, differenceInWeeks } from 'date-fns';
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  upcoming: 'bg-blue-100 text-blue-800',
-  completed: 'bg-gray-100 text-gray-800',
-  at_risk: 'bg-red-100 text-red-800',
-};
 
 export function EngagementDrawer() {
   const router = useRouter();
@@ -103,9 +100,9 @@ export function EngagementDrawer() {
             />
             <Badge
               variant="secondary"
-              className={STATUS_COLORS[engagement.status] || ''}
+              className={ENGAGEMENT_STATUS_BADGE_CLASSES[engagement.status]}
             >
-              {engagement.status.replace('_', ' ')}
+              {ENGAGEMENT_STATUS_LABELS[engagement.status]}
             </Badge>
           </div>
           <SheetTitle className="text-xl tracking-tight leading-tight">
