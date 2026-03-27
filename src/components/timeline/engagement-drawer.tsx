@@ -116,7 +116,7 @@ export function EngagementDrawer() {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 px-4 pb-6">
           {/* Date range */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">

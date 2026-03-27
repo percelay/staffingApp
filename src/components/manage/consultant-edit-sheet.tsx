@@ -165,7 +165,7 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 space-y-6 px-4 pb-6">
           {/* Utilization Banner */}
           <div className="rounded-lg border bg-muted/30 p-4">
             <div className="flex items-center justify-between">
