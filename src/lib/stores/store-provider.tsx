@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { authFetch } from '../api/auth-fetch';
 import { generateSeedData } from '../data/seed';
 import { useConsultantStore } from './consultant-store';
 import { useEngagementStore } from './engagement-store';
@@ -27,10 +28,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try {
         const [consultantsRes, engagementsRes, assignmentsRes, wellbeingRes] =
           await Promise.all([
-            fetch('/api/consultants'),
-            fetch('/api/engagements'),
-            fetch('/api/assignments'),
-            fetch('/api/wellbeing'),
+            authFetch('/api/consultants'),
+            authFetch('/api/engagements'),
+            authFetch('/api/assignments'),
+            authFetch('/api/wellbeing'),
           ]);
 
         // If any request fails, fall back to seed data

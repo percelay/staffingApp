@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { toWellbeingDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
  * Returns all wellbeing signals, optionally filtered by consultant.
  * Query params: ?consultantId=xxx
  */
-export async function GET(request: Request) {
+export const GET = withAuth('wellbeing', async (request) => {
   const { searchParams } = new URL(request.url);
   const consultantId = searchParams.get('consultantId');
 
@@ -22,14 +23,14 @@ export async function GET(request: Request) {
   });
 
   return Response.json(signals.map(toWellbeingDTO));
-}
+});
 
 /**
  * POST /api/wellbeing
  * Record a new wellbeing signal.
  * Body: { consultant_id, signal_type, severity, recorded_at?, notes? }
  */
-export async function POST(request: Request) {
+export const POST = withAuth('wellbeing', async (request) => {
   const body = await request.json();
 
   const signal = await prisma.wellbeingSignal.create({
@@ -43,4 +44,4 @@ export async function POST(request: Request) {
   });
 
   return Response.json(toWellbeingDTO(signal), { status: 201 });
-}
+});

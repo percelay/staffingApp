@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { toEngagementDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
  * Returns all engagements with required skills flattened.
  * Query params: ?status=active|upcoming|completed|at_risk
  */
-export async function GET(request: Request) {
+export const GET = withAuth('engagements', async (request) => {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
 
@@ -25,14 +26,14 @@ export async function GET(request: Request) {
   });
 
   return Response.json(engagements.map(toEngagementDTO));
-}
+});
 
 /**
  * POST /api/engagements
- * Create a new engagement (project).
+ * Create a new engagement (project). Requires partner role.
  * Body: { client_name, project_name, start_date, end_date, status, color, required_skills: string[] }
  */
-export async function POST(request: Request) {
+export const POST = withAuth('engagements', async (request) => {
   const body = await request.json();
   const { required_skills, ...rest } = body;
 
@@ -61,4 +62,4 @@ export async function POST(request: Request) {
   });
 
   return Response.json(toEngagementDTO(engagement), { status: 201 });
-}
+});

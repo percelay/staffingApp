@@ -1,6 +1,6 @@
-import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { toConsultantDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 /**
  * PUT /api/consultants/:id/skills
@@ -12,11 +12,8 @@ import { toConsultantDTO } from '@/lib/api/transformers';
  *   2. Create new ones from the provided array
  *   3. Auto-creates skills that don't exist yet
  */
-export async function PUT(
-  request: NextRequest,
-  ctx: RouteContext<'/api/consultants/[id]/skills'>
-) {
-  const { id } = await ctx.params;
+export const PUT = withAuth('consultants', async (request) => {
+  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
   const { skills } = await request.json();
 
   if (!Array.isArray(skills)) {
@@ -56,4 +53,4 @@ export async function PUT(
   });
 
   return Response.json(toConsultantDTO(consultant!));
-}
+});

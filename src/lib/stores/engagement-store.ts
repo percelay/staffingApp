@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { parseISO } from 'date-fns';
+import { authFetch } from '../api/auth-fetch';
 import type { Engagement } from '../types';
 import { datesOverlap } from '../utils/date-helpers';
 
@@ -30,7 +31,7 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
 
   fetchEngagements: async () => {
     set({ loading: true });
-    const res = await fetch('/api/engagements');
+    const res = await authFetch('/api/engagements');
     const data = await res.json();
     set({ engagements: data, loading: false });
   },
@@ -51,7 +52,7 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
 
   addEngagement: async (data) => {
     try {
-      const res = await fetch('/api/engagements', {
+      const res = await authFetch('/api/engagements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -72,7 +73,7 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
 
   updateEngagement: async (id, data) => {
     try {
-      const res = await fetch(`/api/engagements/${id}`, {
+      const res = await authFetch(`/api/engagements/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -94,7 +95,7 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
 
   removeEngagement: async (id) => {
     try {
-      await fetch(`/api/engagements/${id}`, { method: 'DELETE' });
+      await authFetch(`/api/engagements/${id}`, { method: 'DELETE' });
     } catch {
       // API unavailable — still remove locally
     }

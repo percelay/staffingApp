@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { withAuth } from '@/lib/api/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,7 +7,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/proposals
  * Returns all saved proposals with slots.
  */
-export async function GET() {
+export const GET = withAuth('proposals', async () => {
   const proposals = await prisma.proposal.findMany({
     include: {
       slots: { orderBy: { sortOrder: 'asc' } },
@@ -30,14 +31,14 @@ export async function GET() {
       })),
     }))
   );
-}
+});
 
 /**
  * POST /api/proposals
  * Save a staffing proposal.
  * Body: { engagement_id, fit_score, burnout_risk, slots: [{ role, consultant_id, required }] }
  */
-export async function POST(request: Request) {
+export const POST = withAuth('proposals', async (request) => {
   const body = await request.json();
 
   const proposal = await prisma.proposal.create({
@@ -76,4 +77,4 @@ export async function POST(request: Request) {
     },
     { status: 201 }
   );
-}
+});

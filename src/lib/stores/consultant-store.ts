@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { authFetch } from '../api/auth-fetch';
 import type { Consultant, PracticeArea, SeniorityLevel } from '../types';
 
 interface ConsultantStore {
@@ -29,7 +30,7 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
 
   fetchConsultants: async () => {
     set({ loading: true });
-    const res = await fetch('/api/consultants');
+    const res = await authFetch('/api/consultants');
     const data = await res.json();
     set({ consultants: data, loading: false });
   },
@@ -41,7 +42,7 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
     get().consultants.filter((c) => c.seniority_level === level),
 
   addConsultant: async (data) => {
-    const res = await fetch('/api/consultants', {
+    const res = await authFetch('/api/consultants', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -52,7 +53,7 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
   },
 
   updateConsultant: async (id, data) => {
-    const res = await fetch(`/api/consultants/${id}`, {
+    const res = await authFetch(`/api/consultants/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -64,14 +65,14 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
   },
 
   removeConsultant: async (id) => {
-    await fetch(`/api/consultants/${id}`, { method: 'DELETE' });
+    await authFetch(`/api/consultants/${id}`, { method: 'DELETE' });
     set((s) => ({
       consultants: s.consultants.filter((c) => c.id !== id),
     }));
   },
 
   updateSkills: async (id, skills) => {
-    const res = await fetch(`/api/consultants/${id}/skills`, {
+    const res = await authFetch(`/api/consultants/${id}/skills`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skills }),

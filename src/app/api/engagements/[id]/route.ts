@@ -1,16 +1,13 @@
-import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { toEngagementDTO } from '@/lib/api/transformers';
+import { withAuth } from '@/lib/api/rbac';
 
 /**
  * GET /api/engagements/:id
  * Returns a single engagement with required skills.
  */
-export async function GET(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/engagements/[id]'>
-) {
-  const { id } = await ctx.params;
+export const GET = withAuth('engagements', async (request) => {
+  const id = request.url.split('/api/engagements/')[1]?.split('/')[0]?.split('?')[0];
 
   const engagement = await prisma.engagement.findUnique({
     where: { id },
@@ -22,7 +19,7 @@ export async function GET(
   }
 
   return Response.json(toEngagementDTO(engagement));
-}
+});
 
 /**
  * PATCH /api/engagements/:id
@@ -30,11 +27,8 @@ export async function GET(
  * Body: partial Engagement fields in snake_case.
  *       If required_skills is provided, it replaces the entire skill set.
  */
-export async function PATCH(
-  request: NextRequest,
-  ctx: RouteContext<'/api/engagements/[id]'>
-) {
-  const { id } = await ctx.params;
+export const PATCH = withAuth('engagements', async (request) => {
+  const id = request.url.split('/api/engagements/')[1]?.split('/')[0]?.split('?')[0];
   const body = await request.json();
 
   // Handle skills replacement atomically if provided
@@ -76,19 +70,17 @@ export async function PATCH(
   });
 
   return Response.json(toEngagementDTO(engagement!));
-}
+});
 
 /**
  * DELETE /api/engagements/:id
- * Hard-deletes an engagement. Cascade deletes assignments, proposals, skills.
+ * Hard-deletes an engagement. Requires partner role.
+ * Cascade deletes assignments, proposals, skills.
  */
-export async function DELETE(
-  _req: NextRequest,
-  ctx: RouteContext<'/api/engagements/[id]'>
-) {
-  const { id } = await ctx.params;
+export const DELETE = withAuth('engagements', async (request) => {
+  const id = request.url.split('/api/engagements/')[1]?.split('/')[0]?.split('?')[0];
 
   await prisma.engagement.delete({ where: { id } });
 
   return Response.json({ success: true });
-}
+});
