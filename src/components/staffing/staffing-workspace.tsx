@@ -19,7 +19,7 @@ import {
   getCurrentConsultantUtilization,
 } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getAverageAvailability } from '@/lib/utils/availability';
+import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
 import { getStatusColor } from '@/lib/utils/colors';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
