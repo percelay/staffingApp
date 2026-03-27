@@ -19,7 +19,7 @@ import {
   getCurrentConsultantUtilization,
 } from '@/lib/utils/allocation';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
+import { getWeeklyAllocations } from '@/lib/utils/availability';
 import { getStatusColor } from '@/lib/utils/colors';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
@@ -471,7 +471,8 @@ function EngagementDetail({
                 ) : (
                   availableConsultants.map((c) => {
                     const isSelected = newConsultantId === c.id;
-                    const skillMatch = engagement.required_skills.filter((s) => c.skills.includes(s));
+                    const skillMatch = getConsultantMatches(c.skills, engagement.required_skills);
+                    const goalMatch = getConsultantMatches(c.goals, engagement.required_skills);
                     return (
                       <button
                         key={c.id}
@@ -486,13 +487,26 @@ function EngagementDetail({
                             <span className="text-[10px] text-muted-foreground shrink-0">
                               {SENIORITY_LABELS[c.seniority_level as keyof typeof SENIORITY_LABELS]}
                             </span>
-                            {skillMatch.length > 0 && (
-                              <span className="text-[10px] text-green-600 font-medium shrink-0">
-                                {skillMatch.length}/{engagement.required_skills.length}
-                              </span>
-                            )}
                           </div>
                         </div>
+                        {engagement.required_skills.length > 0 && (
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                            <MatchIndicator
+                              label="Skill"
+                              count={skillMatch.length}
+                              tone="emerald"
+                              titleWhenActive={`${skillMatch.length} current skill${skillMatch.length === 1 ? '' : 's'} match project requirements`}
+                              titleWhenInactive="No current skills match project requirements"
+                            />
+                            <MatchIndicator
+                              label="Goal"
+                              count={goalMatch.length}
+                              tone="sky"
+                              titleWhenActive={`${goalMatch.length} developmental goal${goalMatch.length === 1 ? '' : 's'} match project requirements`}
+                              titleWhenInactive="No developmental goals match project requirements"
+                            />
+                          </div>
+                        )}
                         <AvailabilityBar
                           consultantId={c.id}
                           allAssignments={allAssignments}
@@ -574,7 +588,7 @@ function TeamMemberCard({ assignmentId, consultantName, consultantRole, avatarUr
 }) {
   const [editingAlloc, setEditingAlloc] = useState(false);
   const [localAlloc, setLocalAlloc] = useState(allocation);
-  const matchedSkills = skills.filter((s) => engagementSkills.includes(s));
+  const matchedSkills = getConsultantMatches(skills, engagementSkills);
 
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3">
@@ -637,6 +651,53 @@ function TeamMemberCard({ assignmentId, consultantName, consultantRole, avatarUr
       </div>
     </div>
   );
+}
+
+function MatchIndicator({
+  label,
+  count,
+  tone,
+  titleWhenActive,
+  titleWhenInactive,
+}: {
+  label: string;
+  count: number;
+  tone: 'emerald' | 'sky';
+  titleWhenActive: string;
+  titleWhenInactive: string;
+}) {
+  const active = count > 0;
+  const palette = tone === 'emerald'
+    ? {
+        badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        dot: 'bg-emerald-500',
+      }
+    : {
+        badge: 'border-sky-200 bg-sky-50 text-sky-700',
+        dot: 'bg-sky-500',
+      };
+
+  return (
+    <span
+      className={`inline-flex h-5 items-center gap-1 rounded-full border px-2 text-[10px] font-medium ${
+        active
+          ? palette.badge
+          : 'border-slate-200 bg-slate-50 text-slate-400'
+      }`}
+      title={active ? titleWhenActive : titleWhenInactive}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${active ? palette.dot : 'bg-slate-300'}`} />
+      <span>{label}</span>
+      {active && <span>{count}</span>}
+    </span>
+  );
+}
+
+function getConsultantMatches(source: string[], requiredSkills: string[]) {
+  if (source.length === 0 || requiredSkills.length === 0) return [];
+
+  const required = new Set(requiredSkills.map((skill) => skill.trim().toLowerCase()));
+  return source.filter((item) => required.has(item.trim().toLowerCase()));
 }
 
 // ─── Availability Bar ────────────────────────────────────────────────────────
