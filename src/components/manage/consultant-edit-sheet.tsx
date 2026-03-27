@@ -45,6 +45,7 @@ interface ConsultantEditSheetProps {
 export function ConsultantEditSheet({ consultant, open, onOpenChange }: ConsultantEditSheetProps) {
   const updateConsultant = useConsultantStore((s) => s.updateConsultant);
   const updateSkills = useConsultantStore((s) => s.updateSkills);
+  const updateGoals = useConsultantStore((s) => s.updateGoals);
   const removeConsultant = useConsultantStore((s) => s.removeConsultant);
   const assignments = useAssignmentStore((s) => s.assignments);
   const engagements = useEngagementStore((s) => s.engagements);
@@ -53,6 +54,7 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
   const [seniority, setSeniority] = useState<SeniorityLevel>('consultant');
   const [practiceArea, setPracticeArea] = useState<PracticeArea>('strategy');
   const [skills, setSkills] = useState<string[]>([]);
+  const [goals, setGoals] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -62,6 +64,7 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
       setSeniority(consultant.seniority_level);
       setPracticeArea(consultant.practice_area);
       setSkills([...consultant.skills]);
+      setGoals([...consultant.goals]);
       setConfirmDelete(false);
     }
   }, [consultant]);
@@ -101,6 +104,13 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
       if (skillsChanged) {
         await updateSkills(consultant.id, skills);
       }
+      // Update goals if changed
+      const goalsChanged =
+        goals.length !== consultant.goals.length ||
+        goals.some((g) => !consultant.goals.includes(g));
+      if (goalsChanged) {
+        await updateGoals(consultant.id, goals);
+      }
       onOpenChange(false);
     } catch (e) {
       console.error('Failed to save consultant:', e);
@@ -129,9 +139,21 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
     );
+    // Remove from goals if this skill is being added (consultant now has it)
+    if (!skills.includes(skill)) {
+      setGoals((prev) => prev.filter((g) => g !== skill));
+    }
+  };
+
+  const toggleGoal = (skill: string) => {
+    setGoals((prev) =>
+      prev.includes(skill) ? prev.filter((g) => g !== skill) : [...prev, skill]
+    );
   };
 
   const availableSkills = ALL_SKILLS.filter((s) => !skills.includes(s));
+  // Goals can only be skills the consultant doesn't already have
+  const availableGoalSkills = ALL_SKILLS.filter((s) => !skills.includes(s) && !goals.includes(s));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -238,6 +260,44 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
                     variant="outline"
                     className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
                     onClick={() => toggleSkill(skill)}
+                  >
+                    + {skill}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Goals */}
+          <div className="space-y-3">
+            <Label>Development Goals ({goals.length})</Label>
+            <p className="text-xs text-muted-foreground">
+              Skills this consultant wants to learn. Used for matching to projects that require these skills.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {goals.map((goal) => (
+                <Badge
+                  key={goal}
+                  variant="default"
+                  className="cursor-pointer bg-violet-600 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  onClick={() => toggleGoal(goal)}
+                >
+                  {goal} x
+                </Badge>
+              ))}
+              {goals.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">No development goals set</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Click to add goal:</Label>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                {availableGoalSkills.map((skill) => (
+                  <Badge
+                    key={skill}
+                    variant="outline"
+                    className="cursor-pointer hover:bg-violet-600 hover:text-white transition-colors"
+                    onClick={() => toggleGoal(skill)}
                   >
                     + {skill}
                   </Badge>

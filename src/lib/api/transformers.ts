@@ -25,6 +25,9 @@ type PrismaConsultantWithSkills = {
   skills: Array<{
     skill: { id: string; name: string };
   }>;
+  goals: Array<{
+    skill: { id: string; name: string };
+  }>;
 };
 
 type PrismaEngagementWithSkills = {
@@ -69,6 +72,7 @@ export function toConsultantDTO(p: PrismaConsultantWithSkills): Consultant {
     practice_area: p.practiceArea as Consultant['practice_area'],
     seniority_level: p.seniorityLevel as Consultant['seniority_level'],
     skills: p.skills.map((cs) => cs.skill.name),
+    goals: p.goals.map((cg) => cg.skill.name),
     avatar_url: p.avatarUrl,
   };
 }

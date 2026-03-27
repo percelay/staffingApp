@@ -40,6 +40,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
   const [seniority, setSeniority] = useState<SeniorityLevel>('consultant');
   const [practiceArea, setPracticeArea] = useState<PracticeArea>('strategy');
   const [skills, setSkills] = useState<string[]>([]);
+  const [goals, setGoals] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -52,6 +53,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
         seniority_level: seniority,
         practice_area: practiceArea,
         skills,
+        goals,
         avatar_url: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name.trim())}`,
       });
       // Reset form
@@ -59,6 +61,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
       setSeniority('consultant');
       setPracticeArea('strategy');
       setSkills([]);
+      setGoals([]);
       onOpenChange(false);
     } catch (e) {
       console.error('Failed to add consultant:', e);
@@ -71,7 +74,17 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
     );
+    // Remove from goals if added as a skill
+    setGoals((prev) => prev.filter((g) => g !== skill));
   };
+
+  const toggleGoal = (skill: string) => {
+    setGoals((prev) =>
+      prev.includes(skill) ? prev.filter((g) => g !== skill) : [...prev, skill]
+    );
+  };
+
+  const availableGoalSkills = ALL_SKILLS.filter((s) => !skills.includes(s));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,6 +154,28 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
                   {skills.includes(skill) ? skill + ' x' : '+ ' + skill}
                 </Badge>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Development Goals ({goals.length} selected)</Label>
+            <p className="text-xs text-muted-foreground">
+              Skills this consultant wants to learn.
+            </p>
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border rounded-md p-3">
+              {availableGoalSkills.map((skill) => (
+                <Badge
+                  key={skill}
+                  variant={goals.includes(skill) ? 'default' : 'outline'}
+                  className={`cursor-pointer transition-colors ${goals.includes(skill) ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
+                  onClick={() => toggleGoal(skill)}
+                >
+                  {goals.includes(skill) ? skill + ' x' : '+ ' + skill}
+                </Badge>
+              ))}
+              {availableGoalSkills.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">All skills already assigned</p>
+              )}
             </div>
           </div>
 

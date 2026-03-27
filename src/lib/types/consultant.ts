@@ -8,6 +8,7 @@ export interface Consultant {
   practice_area: PracticeArea;
   seniority_level: SeniorityLevel;
   skills: string[];
+  goals: string[];
   avatar_url: string;
 }
 

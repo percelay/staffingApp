@@ -20,6 +20,7 @@ interface ConsultantStore {
   updateConsultant: (id: string, data: Partial<Consultant>) => Promise<void>;
   removeConsultant: (id: string) => Promise<void>;
   updateSkills: (id: string, skills: string[]) => Promise<void>;
+  updateGoals: (id: string, goals: string[]) => Promise<void>;
 }
 
 export const useConsultantStore = create<ConsultantStore>((set, get) => ({
@@ -76,6 +77,18 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skills }),
+    });
+    const updated = await res.json();
+    set((s) => ({
+      consultants: s.consultants.map((c) => (c.id === id ? updated : c)),
+    }));
+  },
+
+  updateGoals: async (id, goals) => {
+    const res = await authFetch(`/api/consultants/${id}/goals`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goals }),
     });
     const updated = await res.json();
     set((s) => ({

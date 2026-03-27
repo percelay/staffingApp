@@ -24,6 +24,7 @@ export const GET = withAuth('consultants', async (request) => {
     where,
     include: {
       skills: { include: { skill: true } },
+      goals: { include: { skill: true } },
     },
     orderBy: [{ seniorityLevel: 'desc' }, { name: 'asc' }],
   });
@@ -38,7 +39,7 @@ export const GET = withAuth('consultants', async (request) => {
  */
 export const POST = withAuth('consultants', async (request) => {
   const body = await request.json();
-  const { skills, ...rest } = body;
+  const { skills, goals, ...rest } = body;
 
   // Map snake_case frontend fields to camelCase Prisma fields
   const consultant = await prisma.consultant.create({
@@ -59,9 +60,20 @@ export const POST = withAuth('consultants', async (request) => {
           },
         })),
       },
+      goals: {
+        create: (goals || []).map((skillName: string) => ({
+          skill: {
+            connectOrCreate: {
+              where: { name: skillName },
+              create: { name: skillName },
+            },
+          },
+        })),
+      },
     },
     include: {
       skills: { include: { skill: true } },
+      goals: { include: { skill: true } },
     },
   });
 

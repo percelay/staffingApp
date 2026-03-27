@@ -77,6 +77,7 @@ model Skill {
   createdAt DateTime @default(now()) @map("created_at")
 
   consultants      ConsultantSkill[]
+  consultantGoals  ConsultantGoal[]
   engagementSkills EngagementSkill[]
 
   @@map("skills")
@@ -98,6 +99,7 @@ model Consultant {
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
   skills           ConsultantSkill[]
+  goals            ConsultantGoal[]
   assignments      Assignment[]
   wellbeingSignals WellbeingSignal[]
 
@@ -120,6 +122,22 @@ model ConsultantSkill {
 
   @@id([consultantId, skillId])
   @@map("consultant_skills")
+}
+
+// ─────────────────────────────────────────────
+// Consultant <-> Skill Goals (many-to-many)
+// Skills a consultant wants to learn/develop
+// ─────────────────────────────────────────────
+
+model ConsultantGoal {
+  consultantId String @map("consultant_id")
+  skillId      String @map("skill_id")
+
+  consultant Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([consultantId, skillId])
+  @@map("consultant_goals")
 }
 
 // ─────────────────────────────────────────────

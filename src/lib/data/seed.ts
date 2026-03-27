@@ -61,6 +61,9 @@ function generateConsultants(): Consultant[] {
     const seniority = shuffledSeniority[i];
     const numSkills = faker.number.int({ min: 3, max: 6 });
     const skills = faker.helpers.arrayElements(CONSULTING_SKILLS, numSkills);
+    const remainingSkills = CONSULTING_SKILLS.filter((s) => !skills.includes(s));
+    const numGoals = faker.number.int({ min: 1, max: 3 });
+    const goals = faker.helpers.arrayElements(remainingSkills, numGoals);
 
     consultants.push({
       id: `consultant-${i + 1}`,
@@ -72,6 +75,7 @@ function generateConsultants(): Consultant[] {
       practice_area: practiceArea,
       seniority_level: seniority,
       skills,
+      goals,
       avatar_url: `https://api.dicebear.com/9.x/notionists/svg?seed=${faker.string.alphanumeric(8)}`,
     });
   }

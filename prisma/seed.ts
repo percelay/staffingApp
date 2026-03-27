@@ -83,6 +83,7 @@ async function main() {
     prisma.wellbeingSignal.deleteMany(),
     prisma.assignment.deleteMany(),
     prisma.consultantSkill.deleteMany(),
+    prisma.consultantGoal.deleteMany(),
     prisma.engagementSkill.deleteMany(),
     prisma.consultant.deleteMany(),
     prisma.engagement.deleteMany(),
@@ -107,6 +108,11 @@ async function main() {
     const numSkills = faker.number.int({ min: 3, max: 6 });
     const selectedSkills = faker.helpers.arrayElements(CONSULTING_SKILLS, numSkills);
 
+    // Pick 1-3 goals from skills the consultant doesn't already have
+    const remainingSkills = CONSULTING_SKILLS.filter((s) => !selectedSkills.includes(s));
+    const numGoals = faker.number.int({ min: 1, max: 3 });
+    const selectedGoals = faker.helpers.arrayElements(remainingSkills, numGoals);
+
     const consultant = await prisma.consultant.create({
       data: {
         name: faker.person.fullName(),
@@ -117,6 +123,11 @@ async function main() {
         status: 'active',
         skills: {
           create: selectedSkills.map((skillName) => ({
+            skillId: skillByName.get(skillName)!.id,
+          })),
+        },
+        goals: {
+          create: selectedGoals.map((skillName) => ({
             skillId: skillByName.get(skillName)!.id,
           })),
         },

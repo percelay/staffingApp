@@ -11,7 +11,7 @@ export const GET = withAuth('consultants', async (request) => {
 
   const consultant = await prisma.consultant.findUnique({
     where: { id },
-    include: { skills: { include: { skill: true } } },
+    include: { skills: { include: { skill: true } }, goals: { include: { skill: true } } },
   });
 
   if (!consultant) {
@@ -43,7 +43,7 @@ export const PATCH = withAuth('consultants', async (request) => {
   const consultant = await prisma.consultant.update({
     where: { id },
     data,
-    include: { skills: { include: { skill: true } } },
+    include: { skills: { include: { skill: true } }, goals: { include: { skill: true } } },
   });
 
   return Response.json(toConsultantDTO(consultant));
@@ -60,7 +60,7 @@ export const DELETE = withAuth('consultants', async (request) => {
   const consultant = await prisma.consultant.update({
     where: { id },
     data: { status: 'departed' },
-    include: { skills: { include: { skill: true } } },
+    include: { skills: { include: { skill: true } }, goals: { include: { skill: true } } },
   });
 
   return Response.json(toConsultantDTO(consultant));
