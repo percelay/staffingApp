@@ -40,11 +40,23 @@ export function AppSidebar() {
     <Sidebar className="border-r border-border/50">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-            SH
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white border border-slate-200">
+            <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 20C5 18 8 16.5 14 16.5C20 16.5 23 18 25 20" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M6 17V12" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M6 12C6 12 7.5 9 6 7" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M6 12C6 12 4.5 9.5 3 9" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 16.5V10" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 10C14 10 16 7 14 5" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 10C14 10 12 7.5 10 7" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M22 17V11" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M22 11C22 11 23.5 8 22 6" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M22 11C22 11 20 8.5 18 8" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M1 22C4 20 8 18.5 14 18.5C20 18.5 24 20 27 22" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </div>
           <div>
-            <p className="font-semibold text-sm tracking-tight">StaffingHub</p>
+            <p className="font-semibold text-sm tracking-tight">The Field</p>
             <p className="text-xs text-muted-foreground">Staffing Management</p>
           </div>
         </div>

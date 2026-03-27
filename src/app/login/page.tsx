@@ -26,12 +26,24 @@ export default function LoginPage() {
       >
         <Card className="w-[420px] shadow-xl border-0 shadow-slate-200/60">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
-              SH
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-slate-200">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 20C5 18 8 16.5 14 16.5C20 16.5 23 18 25 20" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M6 17V12" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M6 12C6 12 7.5 9 6 7" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M6 12C6 12 4.5 9.5 3 9" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M14 16.5V10" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M14 10C14 10 16 7 14 5" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M14 10C14 10 12 7.5 10 7" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M22 17V11" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M22 11C22 11 23.5 8 22 6" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M22 11C22 11 20 8.5 18 8" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M1 22C4 20 8 18.5 14 18.5C20 18.5 24 20 27 22" stroke="black" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
             </div>
-            <CardTitle className="text-2xl tracking-tight">StaffingHub</CardTitle>
+            <CardTitle className="text-2xl tracking-tight">The Field</CardTitle>
             <CardDescription className="text-base">
-              Visual staffing management for consulting teams
+              A smarter staffing tool
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 pt-4">

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StaffingHub",
-  description: "Visual staffing management for consulting firms",
+  title: "The Field",
+  description: "A smarter staffing tool",
 };
 
 export default function RootLayout({
