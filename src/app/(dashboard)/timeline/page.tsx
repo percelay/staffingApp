@@ -6,7 +6,7 @@ import { StatsBar } from '@/components/timeline/stats-bar';
 
 export default function TimelinePage() {
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0">
       <StatsBar />
       <SwimLaneChart />
       <EngagementDrawer />

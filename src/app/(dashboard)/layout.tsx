@@ -26,13 +26,13 @@ export default function DashboardLayout({
   return (
     <SidebarProvider className="h-full">
       <AppSidebar />
-      <SidebarInset className="flex flex-col flex-1 min-h-0">
+      <SidebarInset className="flex flex-col flex-1 min-h-0 min-w-0">
         <header className="flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h1 className="text-sm font-semibold tracking-tight">StaffingHub</h1>
         </header>
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">
           {children}
         </main>
       </SidebarInset>
