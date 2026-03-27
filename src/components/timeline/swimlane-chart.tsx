@@ -937,8 +937,8 @@ export function SwimLaneChart() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-white">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b bg-white">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <Button
             variant="ghost"
             size="sm"
@@ -958,9 +958,9 @@ export function SwimLaneChart() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            View
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            Timeline View
           </span>
           <Select
             value={viewMode}
@@ -970,8 +970,8 @@ export function SwimLaneChart() {
               });
             }}
           >
-            <SelectTrigger className="min-w-40 bg-white">
-              <SelectValue />
+            <SelectTrigger className="w-[180px] h-8 text-xs bg-white">
+              <SelectValue placeholder="Consultant View" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="consultants">Consultant View</SelectItem>
