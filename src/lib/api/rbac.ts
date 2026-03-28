@@ -22,7 +22,7 @@ export interface AuthContext {
 
 // ─── Permission Definitions ───────────────────────────────────────────────
 
-type Resource = 'consultants' | 'engagements' | 'assignments' | 'proposals' | 'wellbeing' | 'skills' | 'seed';
+type Resource = 'consultants' | 'engagements' | 'assignments' | 'proposals' | 'wellbeing' | 'skills' | 'seed' | 'executive_summary';
 type Action = 'read' | 'create' | 'update' | 'delete';
 
 const PERMISSIONS: Record<Role, Record<Resource, Action[]>> = {
@@ -34,6 +34,7 @@ const PERMISSIONS: Record<Role, Record<Resource, Action[]>> = {
     wellbeing:   ['read', 'create'],
     skills:      ['read'],
     seed:        ['create'],
+    executive_summary: ['read'],
   },
   manager: {
     consultants: ['read', 'update'],
@@ -43,6 +44,7 @@ const PERMISSIONS: Record<Role, Record<Resource, Action[]>> = {
     wellbeing:   ['read', 'create'],
     skills:      ['read'],
     seed:        [],
+    executive_summary: [],
   },
 };
 

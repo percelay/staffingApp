@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 const NAV_ITEMS = [
+  { label: 'Executive', href: '/executive', icon: '◈' },
   { label: 'Timeline', href: '/timeline', icon: '▦' },
   { label: 'Graph', href: '/graph', icon: '◉' },
   { label: 'Staffing', href: '/staffing', icon: '⊞' },
