@@ -46,6 +46,7 @@ export const POST = withAuth('engagements', async (request) => {
       endDate: new Date(rest.end_date),
       status: rest.status ? normalizeEngagementStatus(rest.status) : 'upcoming',
       color: rest.color || '#4F46E5',
+      isBet: rest.is_bet ?? false,
       requiredSkills: {
         create: (required_skills || []).map((skillName: string) => ({
           skill: {

@@ -62,4 +62,5 @@ export interface Engagement {
   required_skills: string[];
   status: EngagementStatus;
   color: string;
+  is_bet: boolean;
 }

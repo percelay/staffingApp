@@ -107,6 +107,7 @@ function generateEngagements(): Engagement[] {
       required_skills: requiredSkills,
       status: isNearEnd ? 'completed' : isStarted ? 'active' : 'upcoming',
       color: CLIENT_COLORS[i % CLIENT_COLORS.length],
+      is_bet: i === 3 || i === 7,
     });
   }
 

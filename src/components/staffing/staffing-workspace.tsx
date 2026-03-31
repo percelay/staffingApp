@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
@@ -1305,6 +1306,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
   const [status, setStatus] = useState<EngagementStatus>('upcoming');
   const [color, setColor] = useState(COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
+  const [isBet, setIsBet] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
@@ -1315,12 +1317,13 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
         project_name: projectName || 'New Project',
         start_date: startDate, end_date: endDate,
         status, color, required_skills: requiredSkills,
+        is_bet: isBet,
       });
       setClientName(''); setProjectName('');
       setStartDate(format(now, 'yyyy-MM-dd'));
       setEndDate(format(addWeeks(now, 8), 'yyyy-MM-dd'));
       setStatus('upcoming'); setColor(COLOR_PALETTE[0]);
-      setRequiredSkills([]);
+      setRequiredSkills([]); setIsBet(false);
       onCreated(eng);
     } catch (e) { console.error('Failed to create engagement:', e); }
     finally { setSaving(false); }
@@ -1383,6 +1386,13 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
                 </Badge>
               ))}
             </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Bet</Label>
+              <p className="text-xs text-muted-foreground">Mark this project as a strategic bet</p>
+            </div>
+            <Switch checked={isBet} onCheckedChange={setIsBet} />
           </div>
           <div className="flex gap-3 pt-2">
             <Button onClick={handleCreate} disabled={saving} className="flex-1">{saving ? 'Creating...' : 'Create Project'}</Button>

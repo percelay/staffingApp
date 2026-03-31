@@ -58,6 +58,7 @@ export const PATCH = withAuth('engagements', async (request) => {
   if (body.end_date !== undefined) data.endDate = new Date(body.end_date);
   if (body.status !== undefined) data.status = normalizeEngagementStatus(body.status);
   if (body.color !== undefined) data.color = body.color;
+  if (body.is_bet !== undefined) data.isBet = body.is_bet;
 
   // Only run update if there are scalar changes
   if (Object.keys(data).length > 0) {

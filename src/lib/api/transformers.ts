@@ -41,6 +41,7 @@ type PrismaEngagementWithSkills = {
   endDate: Date;
   status: string;
   color: string;
+  isBet: boolean;
   requiredSkills: Array<{
     skill: { id: string; name: string };
   }>;
@@ -90,6 +91,7 @@ export function toEngagementDTO(p: PrismaEngagementWithSkills): Engagement {
     required_skills: p.requiredSkills.map((es) => es.skill.name),
     status: normalizeEngagementStatus(p.status),
     color: p.color,
+    is_bet: p.isBet,
   };
 }
 

@@ -152,6 +152,7 @@ model Engagement {
   endDate     DateTime         @map("end_date") @db.Date
   status      EngagementStatus @default(upcoming)
   color       String           @default("#4F46E5")
+  isBet       Boolean          @default(false) @map("is_bet")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 

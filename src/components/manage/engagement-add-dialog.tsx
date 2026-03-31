@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import {
   ENGAGEMENT_STATUS_OPTIONS,
@@ -50,6 +51,7 @@ export function EngagementAddDialog({ open, onOpenChange }: EngagementAddDialogP
   const [status, setStatus] = useState<EngagementStatus>('upcoming');
   const [color, setColor] = useState(COLOR_OPTIONS[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
+  const [isBet, setIsBet] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -64,6 +66,7 @@ export function EngagementAddDialog({ open, onOpenChange }: EngagementAddDialogP
         status,
         color,
         required_skills: requiredSkills,
+        is_bet: isBet,
       });
       // Reset
       setClientName('');
@@ -73,6 +76,7 @@ export function EngagementAddDialog({ open, onOpenChange }: EngagementAddDialogP
       setStatus('upcoming');
       setColor(COLOR_OPTIONS[0]);
       setRequiredSkills([]);
+      setIsBet(false);
       onOpenChange(false);
     } catch (e) {
       console.error('Failed to add engagement:', e);
@@ -167,6 +171,14 @@ export function EngagementAddDialog({ open, onOpenChange }: EngagementAddDialogP
                 </Badge>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Bet</Label>
+              <p className="text-xs text-muted-foreground">Mark this project as a strategic bet</p>
+            </div>
+            <Switch checked={isBet} onCheckedChange={setIsBet} />
           </div>
 
           <div className="flex gap-3 pt-2">
