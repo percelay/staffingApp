@@ -78,11 +78,6 @@ export function EngagementDrawer() {
     return { assignment: a, consultant, burnout };
   });
 
-  const handleViewGraph = () => {
-    setDrawerOpen(false);
-    router.push(`/graph?engagement=${engagement.id}`);
-  };
-
   const handleStaffEngagement = () => {
     setDrawerOpen(false);
     setProposalEngagement(engagement.id);
@@ -213,11 +208,7 @@ export function EngagementDrawer() {
 
           {/* Actions */}
           <div className="flex flex-col gap-2">
-            <Button onClick={handleViewGraph} className="w-full">
-              View in Graph
-            </Button>
             <Button
-              variant="outline"
               onClick={handleStaffEngagement}
               className="w-full"
             >
