@@ -3,10 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { authFetch } from '../api/auth-fetch';
 import { generateSeedData } from '../data/seed';
+import { generateOpportunitySeedData } from '../data/opportunity-seed';
 import { useConsultantStore } from './consultant-store';
 import { useEngagementStore } from './engagement-store';
 import { useAssignmentStore } from './assignment-store';
 import { useWellbeingStore } from './wellbeing-store';
+import { useOpportunityStore } from './opportunity-store';
 
 /**
  * StoreProvider — initializes all Zustand stores on mount.
@@ -62,6 +64,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         useAssignmentStore.getState().setAssignments(assignments);
         useWellbeingStore.getState().setSignals(signals);
 
+        // Try to load opportunities from API; fall back to seed
+        try {
+          const oppRes = await authFetch('/api/opportunities');
+          if (oppRes.ok) {
+            const opportunities = await oppRes.json();
+            if (opportunities.length > 0) {
+              useOpportunityStore.getState().setOpportunities(opportunities);
+              console.log('[StoreProvider] Loaded from database API (with opportunities)');
+              return;
+            }
+          }
+        } catch {
+          // Opportunity API not available — fall through to seed
+        }
+
+        // Seed opportunities even when main data comes from DB
+        loadOpportunitySeed();
         console.log('[StoreProvider] Loaded from database API');
       } catch {
         // Fallback: use in-memory faker seed data
@@ -73,8 +92,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         useAssignmentStore.getState().setAssignments(assignments);
         useWellbeingStore.getState().setSignals(wellbeingSignals);
 
+        loadOpportunitySeed();
         console.log('[StoreProvider] Using in-memory seed data (no database)');
       }
+    }
+
+    function loadOpportunitySeed() {
+      const { opportunities, scenarios } = generateOpportunitySeedData();
+      const store = useOpportunityStore.getState();
+      store.setOpportunities(opportunities);
+      // Hydrate scenarios directly into the store
+      useOpportunityStore.setState({ scenarios });
     }
 
     loadFromAPI();

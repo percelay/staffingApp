@@ -66,6 +66,15 @@ enum Severity {
   high
 }
 
+enum PipelineStage {
+  identified
+  qualifying
+  proposal_sent
+  verbal_commit
+  won
+  lost
+}
+
 // ─────────────────────────────────────────────
 // Skill (normalized — single source of truth)
 // ─────────────────────────────────────────────
@@ -76,9 +85,10 @@ model Skill {
   category  String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  consultants      ConsultantSkill[]
-  consultantGoals  ConsultantGoal[]
-  engagementSkills EngagementSkill[]
+  consultants        ConsultantSkill[]
+  consultantGoals    ConsultantGoal[]
+  engagementSkills   EngagementSkill[]
+  opportunitySkills  OpportunitySkill[]
 
   @@map("skills")
 }
@@ -98,10 +108,11 @@ model Consultant {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  skills           ConsultantSkill[]
-  goals            ConsultantGoal[]
-  assignments      Assignment[]
-  wellbeingSignals WellbeingSignal[]
+  skills                ConsultantSkill[]
+  goals                 ConsultantGoal[]
+  assignments           Assignment[]
+  wellbeingSignals      WellbeingSignal[]
+  tentativeAssignments  TentativeAssignment[]
 
   @@index([practiceArea])
   @@index([seniorityLevel])
@@ -156,9 +167,10 @@ model Engagement {
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
-  requiredSkills EngagementSkill[]
-  assignments    Assignment[]
-  proposals      Proposal[]
+  requiredSkills    EngagementSkill[]
+  assignments       Assignment[]
+  proposals         Proposal[]
+  sourceOpportunity Opportunity?
 
   @@index([status])
   @@index([startDate, endDate])
@@ -265,4 +277,97 @@ model ProposalSlot {
 
   @@index([proposalId])
   @@map("proposal_slots")
+}
+
+// ─────────────────────────────────────────────
+// Opportunity (pipeline / pre-engagement)
+//
+// Fully separate from Engagement. Represents
+// potential projects not yet won. Does NOT affect
+// utilization calculations.
+// ─────────────────────────────────────────────
+
+model Opportunity {
+  id              String        @id @default(cuid())
+  clientName      String        @map("client_name")
+  projectName     String        @map("project_name")
+  startDate       DateTime      @map("start_date") @db.Date
+  endDate         DateTime      @map("end_date") @db.Date
+  stage           PipelineStage @default(identified)
+  probability     Int           @default(25)
+  estimatedValue  Decimal?      @map("estimated_value") @db.Decimal(12, 2)
+  color           String        @default("#6366F1")
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  convertedEngagementId String?     @unique @map("converted_engagement_id")
+  convertedEngagement   Engagement? @relation(fields: [convertedEngagementId], references: [id])
+
+  requiredSkills OpportunitySkill[]
+  scenarios      Scenario[]
+
+  @@index([stage])
+  @@index([startDate, endDate])
+  @@map("opportunities")
+}
+
+// ─────────────────────────────────────────────
+// Opportunity <-> Skill (many-to-many)
+// ─────────────────────────────────────────────
+
+model OpportunitySkill {
+  opportunityId String @map("opportunity_id")
+  skillId       String @map("skill_id")
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  skill       Skill       @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([opportunityId, skillId])
+  @@map("opportunity_skills")
+}
+
+// ─────────────────────────────────────────────
+// Scenario (staffing option for an opportunity)
+// ─────────────────────────────────────────────
+
+model Scenario {
+  id            String  @id @default(cuid())
+  opportunityId String  @map("opportunity_id")
+  name          String
+  isDefault     Boolean @default(false) @map("is_default")
+  fitScore      Int?    @map("fit_score")
+  burnoutImpact Float?  @map("burnout_impact")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  opportunity          Opportunity           @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  tentativeAssignments TentativeAssignment[]
+
+  @@index([opportunityId])
+  @@map("scenarios")
+}
+
+// ─────────────────────────────────────────────
+// Tentative Assignment (within a scenario)
+//
+// Links a consultant to a scenario with a role
+// and allocation. Does NOT count toward real
+// utilization — only used for "what-if" analysis.
+// ─────────────────────────────────────────────
+
+model TentativeAssignment {
+  id                   String         @id @default(cuid())
+  scenarioId           String         @map("scenario_id")
+  consultantId         String         @map("consultant_id")
+  role                 AssignmentRole
+  startDate            DateTime       @map("start_date") @db.Date
+  endDate              DateTime       @map("end_date") @db.Date
+  allocationPercentage Int            @map("allocation_percentage") @default(100)
+
+  scenario   Scenario   @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  consultant Consultant @relation(fields: [consultantId], references: [id])
+
+  @@index([scenarioId])
+  @@index([consultantId])
+  @@map("tentative_assignments")
 }

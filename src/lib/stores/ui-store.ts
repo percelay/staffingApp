@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { PracticeArea } from '../types';
 
-type ActiveView = 'timeline' | 'staffing';
+type ActiveView = 'timeline' | 'staffing' | 'opportunities';
 
 interface UIStore {
   activeView: ActiveView;
@@ -16,6 +16,8 @@ interface UIStore {
   setPracticeAreaFilter: (area: PracticeArea | null) => void;
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
+  showOpportunityOverlay: boolean;
+  setShowOpportunityOverlay: (show: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -33,4 +35,7 @@ export const useUIStore = create<UIStore>((set) => ({
   setPracticeAreaFilter: (practiceAreaFilter) => set({ practiceAreaFilter }),
   drawerOpen: false,
   setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
+  showOpportunityOverlay: false,
+  setShowOpportunityOverlay: (showOpportunityOverlay) =>
+    set({ showOpportunityOverlay }),
 }));

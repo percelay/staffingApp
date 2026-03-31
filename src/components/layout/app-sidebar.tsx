@@ -21,7 +21,8 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 const NAV_ITEMS = [
   { label: 'Executive', href: '/executive', icon: '◈' },
   { label: 'Timeline', href: '/timeline', icon: '▦' },
-{ label: 'Staffing', href: '/staffing', icon: '⊞' },
+  { label: 'Pipeline', href: '/opportunities', icon: '◇' },
+  { label: 'Staffing', href: '/staffing', icon: '⊞' },
   { label: 'People', href: '/manage', icon: '◎' },
 ];
 

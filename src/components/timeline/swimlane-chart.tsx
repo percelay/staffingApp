@@ -26,6 +26,8 @@ import {
   type EngagementStatus,
 } from '@/lib/types/engagement';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -33,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useOpportunityStore } from '@/lib/stores/opportunity-store';
+import { ACTIVE_PIPELINE_STAGES } from '@/lib/types/opportunity';
 
 const BASE_LANE_HEIGHT = 64;
 const HEADER_WIDTH = 260;
@@ -364,6 +368,10 @@ export function SwimLaneChart() {
   const setSelectedEngagement = useUIStore((s) => s.setSelectedEngagementId);
   const setDrawerOpen = useUIStore((s) => s.setDrawerOpen);
   const currentUser = useAuthStore((s) => s.currentUser);
+  const showOpportunityOverlay = useUIStore((s) => s.showOpportunityOverlay);
+  const setShowOpportunityOverlay = useUIStore((s) => s.setShowOpportunityOverlay);
+  const opportunities = useOpportunityStore((s) => s.opportunities);
+  const oppScenarios = useOpportunityStore((s) => s.scenarios);
 
   const practiceAreaFilter =
     currentUser?.role === 'manager' ? currentUser.practice_area : null;
@@ -887,6 +895,152 @@ export function SwimLaneChart() {
     setSelectedEngagement,
   ]);
 
+  // ─── Opportunity Overlay (additive, separate render pass) ──────────────
+  useEffect(() => {
+    if (!svgRef.current || !showOpportunityOverlay || viewMode !== 'consultants') return;
+
+    const svg = d3.select(svgRef.current);
+    // Remove previous overlay elements only
+    svg.selectAll('.opportunity-overlay').remove();
+
+    if (sections.length === 0) return;
+
+    const xScale = d3.scaleTime().domain([start, end]).range([0, chartWidth]);
+
+    // Build a map of consultantId → y-position from the lane layout
+    const consultantYPositions = new Map<string, { y: number; height: number }>();
+    let currentY = 0;
+    for (const section of sections) {
+      currentY += GROUP_HEADER_HEIGHT;
+      for (const lane of section.lanes) {
+        const laneHeight = laneLayouts.get(lane.id)?.height || BASE_LANE_HEIGHT;
+        if (lane.consultantId) {
+          consultantYPositions.set(lane.consultantId, { y: currentY, height: laneHeight });
+        }
+        currentY += laneHeight;
+      }
+    }
+
+    // Get active opportunities with their default scenarios
+    const activeOpps = opportunities.filter((o) =>
+      ACTIVE_PIPELINE_STAGES.includes(o.stage)
+    );
+
+    const overlayGroup = svg.append('g').attr('class', 'opportunity-overlay');
+
+    // Add striped pattern for tentative blocks
+    let defs = svg.select<SVGDefsElement>('defs');
+    if (defs.empty()) {
+      defs = svg.append('defs');
+    }
+    if (defs.select('#tentative-stripes').empty()) {
+      const pattern = defs
+        .append('pattern')
+        .attr('id', 'tentative-stripes')
+        .attr('width', 6)
+        .attr('height', 6)
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('patternTransform', 'rotate(45)');
+      pattern
+        .append('line')
+        .attr('x1', 0)
+        .attr('y1', 0)
+        .attr('x2', 0)
+        .attr('y2', 6)
+        .attr('stroke', 'rgba(255,255,255,0.3)')
+        .attr('stroke-width', 2);
+    }
+
+    for (const opp of activeOpps) {
+      const defaultScenario =
+        oppScenarios.find((s) => s.opportunity_id === opp.id && s.is_default) ||
+        oppScenarios.find((s) => s.opportunity_id === opp.id);
+
+      if (!defaultScenario) continue;
+
+      for (const ta of defaultScenario.tentative_assignments) {
+        const pos = consultantYPositions.get(ta.consultant_id);
+        if (!pos) continue;
+
+        const taStart = parseISO(ta.start_date);
+        const taEnd = parseISO(ta.end_date);
+
+        // Skip if outside view window
+        if (taEnd < start || taStart > end) continue;
+
+        const clippedStart = taStart > start ? taStart : start;
+        const clippedEnd = taEnd < end ? taEnd : end;
+
+        const x = Math.max(0, xScale(clippedStart));
+        const x2 = Math.min(chartWidth, xScale(clippedEnd));
+        const blockWidth = Math.max(MIN_BLOCK_WIDTH, x2 - x);
+
+        // Scale height by allocation but use weighted opacity by probability
+        const blockHeight = Math.max(
+          12,
+          (ta.allocation_percentage / 100) * BASE_BLOCK_HEIGHT * 0.6
+        );
+        const blockY = pos.y + pos.height - BLOCK_PADDING - blockHeight;
+        const opacity = 0.25 + (opp.probability / 100) * 0.35;
+
+        const blockGroup = overlayGroup.append('g');
+
+        // Dashed border rectangle
+        blockGroup
+          .append('rect')
+          .attr('x', x + 2)
+          .attr('y', blockY)
+          .attr('width', blockWidth - 4)
+          .attr('height', blockHeight)
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .attr('fill', opp.color)
+          .attr('fill-opacity', opacity)
+          .attr('stroke', opp.color)
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '4,3')
+          .attr('stroke-opacity', 0.7)
+          .attr('pointer-events', 'none');
+
+        // Striped overlay
+        blockGroup
+          .append('rect')
+          .attr('x', x + 2)
+          .attr('y', blockY)
+          .attr('width', blockWidth - 4)
+          .attr('height', blockHeight)
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .attr('fill', 'url(#tentative-stripes)')
+          .attr('pointer-events', 'none');
+
+        // Label if wide enough
+        if (blockWidth > 70 && blockHeight >= 14) {
+          const label = `${opp.client_name} (${opp.probability}%)`;
+          appendTruncatedText(blockGroup, {
+            fill: opp.color,
+            fontSize: '9px',
+            fontWeight: '600',
+            maxWidth: blockWidth - 16,
+            text: label,
+            x: x + 8,
+            y: blockY + blockHeight / 2 + 1,
+          });
+        }
+      }
+    }
+  }, [
+    chartWidth,
+    end,
+    laneLayouts,
+    opportunities,
+    oppScenarios,
+    sections,
+    showOpportunityOverlay,
+    start,
+    viewMode,
+  ]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
       <div className="flex flex-col gap-2 px-4 py-2 border-b bg-white">
@@ -938,6 +1092,19 @@ export function SwimLaneChart() {
           >
             Today
           </Button>
+          {viewMode === 'consultants' && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Switch
+                id="opp-overlay"
+                checked={showOpportunityOverlay}
+                onCheckedChange={setShowOpportunityOverlay}
+                className="scale-75"
+              />
+              <Label htmlFor="opp-overlay" className="text-[11px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                Show Pipeline
+              </Label>
+            </div>
+          )}
         </div>
       </div>
 

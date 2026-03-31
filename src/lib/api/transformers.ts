@@ -14,6 +14,12 @@ import {
 } from '../types/engagement';
 import type { Assignment } from '../types/assignment';
 import type { WellbeingSignal } from '../types/wellbeing';
+import {
+  normalizePipelineStage,
+  type Opportunity,
+  type Scenario,
+  type TentativeAssignment,
+} from '../types/opportunity';
 
 // ─── Prisma result types (what queries return) ──────────────
 
@@ -114,6 +120,91 @@ export function toWellbeingDTO(p: PrismaWellbeingSignal): WellbeingSignal {
     signal_type: p.signalType as WellbeingSignal['signal_type'],
     severity: p.severity as WellbeingSignal['severity'],
     recorded_at: formatDate(p.recordedAt),
+  };
+}
+
+// ─── Opportunity Transformers ─────────────────────────────
+
+type PrismaOpportunityWithSkills = {
+  id: string;
+  clientName: string;
+  projectName: string;
+  startDate: Date;
+  endDate: Date;
+  stage: string;
+  probability: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  estimatedValue: any; // Prisma Decimal
+  color: string;
+  notes: string | null;
+  convertedEngagementId: string | null;
+  requiredSkills: Array<{
+    skill: { id: string; name: string };
+  }>;
+};
+
+type PrismaScenario = {
+  id: string;
+  opportunityId: string;
+  name: string;
+  isDefault: boolean;
+  fitScore: number | null;
+  burnoutImpact: number | null;
+  tentativeAssignments?: PrismaTentativeAssignment[];
+};
+
+type PrismaTentativeAssignment = {
+  id: string;
+  scenarioId: string;
+  consultantId: string;
+  role: string;
+  startDate: Date;
+  endDate: Date;
+  allocationPercentage: number;
+};
+
+export function toOpportunityDTO(p: PrismaOpportunityWithSkills): Opportunity {
+  return {
+    id: p.id,
+    client_name: p.clientName,
+    project_name: p.projectName,
+    start_date: formatDate(p.startDate),
+    end_date: formatDate(p.endDate),
+    stage: normalizePipelineStage(p.stage),
+    probability: p.probability,
+    estimated_value: p.estimatedValue ? Number(p.estimatedValue) : null,
+    required_skills: p.requiredSkills.map((os) => os.skill.name),
+    color: p.color,
+    notes: p.notes,
+    converted_engagement_id: p.convertedEngagementId,
+  };
+}
+
+export function toScenarioDTO(p: PrismaScenario): Scenario {
+  return {
+    id: p.id,
+    opportunity_id: p.opportunityId,
+    name: p.name,
+    is_default: p.isDefault,
+    fit_score: p.fitScore,
+    burnout_impact: p.burnoutImpact,
+    tentative_assignments: (p.tentativeAssignments || []).map(
+      toTentativeAssignmentDTO
+    ),
+  };
+}
+
+export function toTentativeAssignmentDTO(
+  p: PrismaTentativeAssignment
+): TentativeAssignment {
+  return {
+    id: p.id,
+    scenario_id: p.scenarioId,
+    consultant_id: p.consultantId,
+    role: p.role as TentativeAssignment['role'],
+    start_date: formatDate(p.startDate),
+    end_date: formatDate(p.endDate),
+    allocation_percentage: p.allocationPercentage,
   };
 }
 
