@@ -368,7 +368,12 @@ export function SwimLaneChart() {
   const setSelectedEngagement = useUIStore((s) => s.setSelectedEngagementId);
   const setDrawerOpen = useUIStore((s) => s.setDrawerOpen);
   const currentUser = useAuthStore((s) => s.currentUser);
-  const showOpportunityOverlay = useUIStore((s) => s.showOpportunityOverlay);
+  const activeView = useUIStore((s) => s.activeView);
+  const isActualTimeline = activeView === 'actual-timeline';
+  const isPotentialTimeline = activeView === 'potential-timeline';
+  const rawOverlayPref = useUIStore((s) => s.showOpportunityOverlay);
+  // Potential timeline: always show overlay. Actual timeline: never show.
+  const showOpportunityOverlay = isPotentialTimeline ? true : (rawOverlayPref && !isActualTimeline);
   const setShowOpportunityOverlay = useUIStore((s) => s.setShowOpportunityOverlay);
   const opportunities = useOpportunityStore((s) => s.opportunities);
   const oppScenarios = useOpportunityStore((s) => s.scenarios);
@@ -1098,9 +1103,13 @@ export function SwimLaneChart() {
                 id="opp-overlay"
                 checked={showOpportunityOverlay}
                 onCheckedChange={setShowOpportunityOverlay}
+                disabled={isActualTimeline || isPotentialTimeline}
                 className="scale-75"
               />
-              <Label htmlFor="opp-overlay" className="text-[11px] text-muted-foreground cursor-pointer whitespace-nowrap">
+              <Label
+                htmlFor="opp-overlay"
+                className={`text-[11px] cursor-pointer whitespace-nowrap ${(isActualTimeline || isPotentialTimeline) ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}
+              >
                 Show Pipeline
               </Label>
             </div>

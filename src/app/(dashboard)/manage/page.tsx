@@ -10,11 +10,15 @@ import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import { useUIStore } from '@/lib/stores/ui-store';
+import { useOpportunityStore } from '@/lib/stores/opportunity-store';
 import { getCurrentConsultantUtilization, isAssignmentActiveOnDate } from '@/lib/utils/allocation';
+import { getProjectedUtilization, getCapacityConflicts } from '@/lib/utils/impact';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor } from '@/lib/utils/colors';
 import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import type { PracticeArea, SeniorityLevel } from '@/lib/types/consultant';
+import { ACTIVE_PIPELINE_STAGES } from '@/lib/types/opportunity';
 import {
   ENGAGEMENT_STATUS_DOT_CLASSES,
   ENGAGEMENT_STATUS_LABELS,
@@ -33,6 +37,10 @@ export default function ManagePage() {
   const engagements = useEngagementStore((s) => s.engagements);
   const assignments = useAssignmentStore((s) => s.assignments);
   const signals = useWellbeingStore((s) => s.signals);
+  const activeView = useUIStore((s) => s.activeView);
+  const isPotentialPeople = activeView === 'potential-people';
+  const opportunities = useOpportunityStore((s) => s.opportunities);
+  const scenarios = useOpportunityStore((s) => s.scenarios);
 
   const [tab, setTab] = useState<Tab>('people');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +58,36 @@ export default function ManagePage() {
   const selectedEngagement = selectedEngagementId
     ? engagements.find((e) => e.id === selectedEngagementId) ?? null
     : null;
+
+  // Collect all tentative assignments from active opportunity default scenarios
+  const allTentativeAssignments = useMemo(() => {
+    if (!isPotentialPeople) return [];
+    const activeOpps = opportunities.filter((o) =>
+      ACTIVE_PIPELINE_STAGES.includes(o.stage)
+    );
+    const activeOppIds = new Set(activeOpps.map((o) => o.id));
+    return scenarios
+      .filter((s) => activeOppIds.has(s.opportunity_id))
+      .flatMap((s) => s.tentative_assignments);
+  }, [isPotentialPeople, opportunities, scenarios]);
+
+  // Build a set of consultant IDs that have capacity conflicts
+  const conflictedConsultantIds = useMemo(() => {
+    if (!isPotentialPeople) return new Set<string>();
+    const ids = new Set<string>();
+    const activeOpps = opportunities.filter((o) =>
+      ACTIVE_PIPELINE_STAGES.includes(o.stage)
+    );
+    const activeOppIds = new Set(activeOpps.map((o) => o.id));
+    for (const scenario of scenarios) {
+      if (!activeOppIds.has(scenario.opportunity_id)) continue;
+      const conflicts = getCapacityConflicts(scenario, assignments);
+      for (const c of conflicts) {
+        ids.add(c.consultant_id);
+      }
+    }
+    return ids;
+  }, [isPotentialPeople, opportunities, scenarios, assignments]);
 
   const enrichedConsultants = useMemo(() => {
     let list = [...consultants];
@@ -77,12 +115,19 @@ export default function ManagePage() {
       const assignmentCount = assignments.filter(
         (a) => a.consultant_id === c.id && isAssignmentActiveOnDate(a, now)
       ).length;
-      return { consultant: c, burnout, currentUtilization, assignmentCount };
+
+      // Projected utilization: actual + tentative (potential-people only)
+      const projectedUtilization = isPotentialPeople
+        ? getProjectedUtilization(c.id, assignments, allTentativeAssignments, now)
+        : null;
+      const hasConflict = isPotentialPeople && conflictedConsultantIds.has(c.id);
+
+      return { consultant: c, burnout, currentUtilization, assignmentCount, projectedUtilization, hasConflict };
     }).sort((a, b) => {
       const seniorityOrder: Record<string, number> = { partner: 5, senior_manager: 4, manager: 3, consultant: 2, analyst: 1 };
       return (seniorityOrder[b.consultant.seniority_level] ?? 0) - (seniorityOrder[a.consultant.seniority_level] ?? 0);
     });
-  }, [consultants, practiceFilter, searchQuery, assignments, signals]);
+  }, [consultants, practiceFilter, searchQuery, assignments, signals, isPotentialPeople, allTentativeAssignments, conflictedConsultantIds]);
 
   const filteredEngagements = useMemo(() => {
     let list = [...engagements];
@@ -108,10 +153,17 @@ export default function ManagePage() {
           <div>
             <h1 className="text-lg font-semibold tracking-tight">
               {tab === 'people' ? 'People' : 'Engagements'}
+              {isPotentialPeople && tab === 'people' && (
+                <Badge variant="outline" className="ml-2 text-[10px] font-normal text-indigo-600 border-indigo-200 bg-indigo-50">
+                  Impact Analysis
+                </Badge>
+              )}
             </h1>
             <p className="text-sm text-muted-foreground">
               {tab === 'people'
-                ? `${consultants.length} consultants`
+                ? isPotentialPeople
+                  ? `${consultants.length} consultants · projected with pipeline scenarios`
+                  : `${consultants.length} consultants`
                 : `${engagements.length} engagements`}
             </p>
           </div>
@@ -178,13 +230,16 @@ export default function ManagePage() {
           <div className="grid gap-2">
             {tab === 'people' ? (
               <>
-                {enrichedConsultants.map(({ consultant, burnout, currentUtilization, assignmentCount }) => {
+                {enrichedConsultants.map(({ consultant, burnout, currentUtilization, assignmentCount, projectedUtilization, hasConflict }) => {
                   const statusColor = getStatusColor(burnout);
+                  const delta = projectedUtilization !== null ? projectedUtilization - currentUtilization : null;
                   return (
                     <button
                       key={consultant.id}
                       onClick={() => setSelectedConsultantId(consultant.id)}
-                      className="w-full text-left p-4 rounded-lg border bg-white hover:border-primary/30 hover:shadow-sm transition-all flex items-center gap-4"
+                      className={`w-full text-left p-4 rounded-lg border bg-white hover:border-primary/30 hover:shadow-sm transition-all flex items-center gap-4 ${
+                        hasConflict ? 'border-red-300 bg-red-50/40' : ''
+                      }`}
                     >
                       <div className="relative">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -201,6 +256,11 @@ export default function ManagePage() {
                           <Badge variant="outline" className="text-[10px] capitalize">
                             {consultant.practice_area}
                           </Badge>
+                          {hasConflict && (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Over-allocated
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-muted-foreground">
@@ -229,6 +289,22 @@ export default function ManagePage() {
                           </p>
                           <p className="text-[10px] text-muted-foreground">Current UR</p>
                         </div>
+                        {projectedUtilization !== null && delta !== null && delta > 0 && (
+                          <div className="text-right">
+                            <p className={`text-sm font-bold ${
+                              projectedUtilization > 100
+                                ? 'text-red-500'
+                                : projectedUtilization > 80
+                                ? 'text-amber-500'
+                                : 'text-indigo-500'
+                            }`}>
+                              {projectedUtilization}%
+                            </p>
+                            <p className="text-[10px] text-indigo-500 font-medium">
+                              +{delta}% projected
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </button>
                   );

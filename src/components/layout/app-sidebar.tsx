@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Sidebar,
@@ -17,13 +18,29 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useUIStore, type ActiveView } from '@/lib/stores/ui-store';
 
-const NAV_ITEMS = [
+interface NavItem {
+  label: string;
+  icon: string;
+  view: ActiveView;
+  href: string;
+}
+
+const ACTUAL_ITEMS: NavItem[] = [
+  { label: 'Timeline', icon: '▦', view: 'actual-timeline', href: '/timeline' },
+  { label: 'Staffing', icon: '⊞', view: 'actual-staffing', href: '/staffing' },
+  { label: 'People', icon: '◎', view: 'actual-people', href: '/manage' },
+];
+
+const POTENTIAL_ITEMS: NavItem[] = [
+  { label: 'Timeline', icon: '▦', view: 'potential-timeline', href: '/timeline' },
+  { label: 'Staffing', icon: '⊞', view: 'potential-staffing', href: '/opportunities' },
+  { label: 'People', icon: '◎', view: 'potential-people', href: '/manage' },
+];
+
+const TOP_ITEMS = [
   { label: 'Executive', href: '/executive', icon: '◈' },
-  { label: 'Timeline', href: '/timeline', icon: '▦' },
-  { label: 'Pipeline', href: '/opportunities', icon: '◇' },
-  { label: 'Staffing', href: '/staffing', icon: '⊞' },
-  { label: 'People', href: '/manage', icon: '◎' },
 ];
 
 export function AppSidebar() {
@@ -31,10 +48,19 @@ export function AppSidebar() {
   const pathname = usePathname();
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const [actualOpen, setActualOpen] = useState(true);
+  const [potentialOpen, setPotentialOpen] = useState(true);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
+  };
+
+  const handleNav = (item: NavItem) => {
+    setActiveView(item.view);
+    router.push(item.href);
   };
 
   return (
@@ -64,11 +90,11 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Top-level items */}
         <SidebarGroup>
-          <SidebarGroupLabel>Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {TOP_ITEMS.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     isActive={pathname === item.href}
@@ -82,6 +108,64 @@ export function AppSidebar() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Actual group */}
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className="cursor-pointer select-none"
+            onClick={() => setActualOpen(!actualOpen)}
+          >
+            <span className="text-[10px] mr-1.5 text-muted-foreground">{actualOpen ? '▾' : '▸'}</span>
+            Actual
+          </SidebarGroupLabel>
+          {actualOpen && (
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {ACTUAL_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.view}>
+                    <SidebarMenuButton
+                      isActive={activeView === item.view}
+                      onClick={() => handleNav(item)}
+                      className="gap-3"
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          )}
+        </SidebarGroup>
+
+        {/* Potential group */}
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className="cursor-pointer select-none"
+            onClick={() => setPotentialOpen(!potentialOpen)}
+          >
+            <span className="text-[10px] mr-1.5 text-muted-foreground">{potentialOpen ? '▾' : '▸'}</span>
+            Potential
+          </SidebarGroupLabel>
+          {potentialOpen && (
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {POTENTIAL_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.view}>
+                    <SidebarMenuButton
+                      isActive={activeView === item.view}
+                      onClick={() => handleNav(item)}
+                      className="gap-3"
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          )}
         </SidebarGroup>
       </SidebarContent>
 
