@@ -288,7 +288,7 @@ model ProposalSlot {
 // ─────────────────────────────────────────────
 
 model Opportunity {
-  id              String        @id @default(cuid())
+  id              String        @id @default(uuid())
   clientName      String        @map("client_name")
   projectName     String        @map("project_name")
   startDate       DateTime      @map("start_date") @db.Date

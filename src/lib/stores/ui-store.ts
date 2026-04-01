@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { PracticeArea } from '../types';
 
-type ActiveView = 'timeline' | 'staffing' | 'opportunities';
+type ActiveView = 'actual-timeline' | 'actual-staffing' | 'actual-people' | 'potential-timeline' | 'potential-staffing' | 'potential-people' | 'opportunities';
 
 interface UIStore {
   activeView: ActiveView;
@@ -21,7 +21,7 @@ interface UIStore {
 }
 
 export const useUIStore = create<UIStore>((set) => ({
-  activeView: 'timeline',
+  activeView: 'actual-timeline',
   setActiveView: (activeView) => set({ activeView }),
   selectedEngagementId: null,
   setSelectedEngagementId: (selectedEngagementId) =>
