@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { addWeeks, format, startOfWeek } from 'date-fns';
+import { createOpportunityAndRedirect } from '@/app/(dashboard)/opportunities/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,9 +55,9 @@ export function CreateOpportunityDialog({
   onOpenChange,
   editingOpportunity,
 }: Props) {
-  const addOpportunity = useOpportunityStore((s) => s.addOpportunity);
   const updateOpportunity = useOpportunityStore((s) => s.updateOpportunity);
   const isEditing = Boolean(editingOpportunity);
+  const [isCreating, startCreateTransition] = useTransition();
 
   const now = startOfWeek(new Date(), { weekStartsOn: 1 });
   const [clientName, setClientName] = useState(editingOpportunity?.client_name ?? '');
@@ -69,37 +70,40 @@ export function CreateOpportunityDialog({
   const [color, setColor] = useState(editingOpportunity?.color ?? COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>(editingOpportunity?.required_skills ?? []);
   const [notes, setNotes] = useState(editingOpportunity?.notes ?? '');
-  const [saving, setSaving] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      const data = {
-        client_name: clientName || 'New Client',
-        project_name: projectName || 'New Opportunity',
-        start_date: startDate,
-        end_date: endDate,
-        stage,
-        probability,
-        estimated_value: estimatedValue ? Number(estimatedValue) : null,
-        color,
-        required_skills: requiredSkills,
-        notes: notes || null,
-        converted_engagement_id: null,
-      };
+    const data = {
+      client_name: clientName || 'New Client',
+      project_name: projectName || 'New Opportunity',
+      start_date: startDate,
+      end_date: endDate,
+      stage,
+      probability,
+      estimated_value: estimatedValue ? Number(estimatedValue) : null,
+      color,
+      required_skills: requiredSkills,
+      notes: notes || null,
+      converted_engagement_id: null,
+    };
 
-      if (isEditing && editingOpportunity) {
+    if (isEditing && editingOpportunity) {
+      setSavingEdit(true);
+      try {
         await updateOpportunity(editingOpportunity.id, data);
-      } else {
-        await addOpportunity(data);
+        onOpenChange(false);
+        resetForm();
+      } catch (e) {
+        console.error('Failed to save opportunity:', e);
+      } finally {
+        setSavingEdit(false);
       }
-      onOpenChange(false);
-      resetForm();
-    } catch (e) {
-      console.error('Failed to save opportunity:', e);
-    } finally {
-      setSaving(false);
+      return;
     }
+
+    startCreateTransition(async () => {
+      await createOpportunityAndRedirect(data);
+    });
   };
 
   const resetForm = () => {
@@ -114,6 +118,8 @@ export function CreateOpportunityDialog({
     setRequiredSkills([]);
     setNotes('');
   };
+
+  const isSaving = savingEdit || isCreating;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -254,10 +260,10 @@ export function CreateOpportunityDialog({
           <div className="flex gap-3 pt-2">
             <Button
               onClick={handleSubmit}
-              disabled={saving}
+              disabled={isSaving}
               className="flex-1"
             >
-              {saving
+              {isSaving
                 ? 'Saving...'
                 : isEditing
                   ? 'Save Changes'

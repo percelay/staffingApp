@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { parseISO, differenceInWeeks } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
-import { useConsultantStore } from '@/lib/stores/consultant-store';
 import {
   PIPELINE_STAGE_LABELS,
-  PIPELINE_STAGE_BADGE_CLASSES,
   ACTIVE_PIPELINE_STAGES,
   type PipelineStage,
 } from '@/lib/types/opportunity';
@@ -33,10 +31,8 @@ const COLUMN_ACCENT: Record<PipelineStage, string> = {
 };
 
 export function OpportunityPipeline() {
-  const router = useRouter();
   const opportunities = useOpportunityStore((s) => s.opportunities);
   const scenarios = useOpportunityStore((s) => s.scenarios);
-  const consultants = useConsultantStore((s) => s.consultants);
   const [showNewDialog, setShowNewDialog] = useState(false);
 
   const activeOpps = useMemo(
@@ -113,10 +109,10 @@ export function OpportunityPipeline() {
                   const teamSize = scenario?.tentative_assignments.length ?? 0;
 
                   return (
-                    <button
+                    <Link
                       key={opp.id}
-                      onClick={() => router.push(`/opportunities/${opp.id}`)}
-                      className="w-full text-left p-3 rounded-lg border bg-white hover:shadow-sm hover:border-slate-300 transition-all"
+                      href={`/opportunities/${opp.id}`}
+                      className="block w-full rounded-lg border bg-white p-3 text-left transition-all hover:border-slate-300 hover:shadow-sm"
                     >
                       <div className="flex items-start gap-2">
                         <div
@@ -143,7 +139,7 @@ export function OpportunityPipeline() {
                         <span className="text-[10px] text-muted-foreground">
                           {weeks}w
                         </span>
-                        {opp.estimated_value && (
+                        {opp.estimated_value !== null && (
                           <span className="text-[10px] text-muted-foreground">
                             ${Math.round(opp.estimated_value / 1000)}k
                           </span>
@@ -172,7 +168,7 @@ export function OpportunityPipeline() {
                           )}
                         </div>
                       )}
-                    </button>
+                    </Link>
                   );
                 })}
 
