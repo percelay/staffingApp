@@ -9,7 +9,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 function formatDateOnly(date: Date) {
-  return date.toISOString().split('T')[0];
+  return date.toLocaleDateString('en-US');
 }
 
 function formatCurrency(value: number | null) {
@@ -63,9 +63,7 @@ export default async function OpportunityDetailPage({
     },
   });
 
-  if (!opportunity) {
-    notFound();
-  }
+  if (!opportunity) return notFound();
 
   const requiredSkills = opportunity.requiredSkills.map((item) => item.skill.name);
 
