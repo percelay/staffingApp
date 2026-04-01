@@ -8,10 +8,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function formatDateOnly(date: string) {
-  return new Date(date).toLocaleDateString('en-US');
-}
-
 function formatCurrency(value: string | null) {
   if (value === null) {
     return '--';
@@ -22,6 +18,15 @@ function formatCurrency(value: string | null) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(Number(value));
+}
+
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 export default async function OpportunityDetailPage({
@@ -75,6 +80,8 @@ export default async function OpportunityDetailPage({
     notes: opportunity.notes,
     startDate: opportunity.startDate.toISOString(),
     endDate: opportunity.endDate.toISOString(),
+    startDateLabel: formatDateLabel(opportunity.startDate),
+    endDateLabel: formatDateLabel(opportunity.endDate),
     estimatedValue: opportunity.estimatedValue?.toString() ?? null,
     requiredSkills: opportunity.requiredSkills.map((item) => item.skill.name),
     scenarios: opportunity.scenarios.map((scenario) => ({
@@ -153,7 +160,7 @@ export default async function OpportunityDetailPage({
                   Start Date
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {formatDateOnly(safeOpportunity.startDate)}
+                  {safeOpportunity.startDateLabel}
                 </p>
               </div>
               <div className="rounded-xl border bg-slate-50 p-4">
@@ -161,7 +168,7 @@ export default async function OpportunityDetailPage({
                   End Date
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {formatDateOnly(safeOpportunity.endDate)}
+                  {safeOpportunity.endDateLabel}
                 </p>
               </div>
               <div className="rounded-xl border bg-slate-50 p-4">
