@@ -8,11 +8,11 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function formatDateOnly(date: Date) {
-  return date.toLocaleDateString('en-US');
+function formatDateOnly(date: string) {
+  return new Date(date).toLocaleDateString('en-US');
 }
 
-function formatCurrency(value: number | null) {
+function formatCurrency(value: string | null) {
   if (value === null) {
     return '--';
   }
@@ -21,7 +21,7 @@ function formatCurrency(value: number | null) {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(Number(value));
 }
 
 export default async function OpportunityDetailPage({
@@ -65,7 +65,33 @@ export default async function OpportunityDetailPage({
 
   if (!opportunity) return notFound();
 
-  const requiredSkills = opportunity.requiredSkills.map((item) => item.skill.name);
+  const safeOpportunity = {
+    id: opportunity.id,
+    clientName: opportunity.clientName,
+    projectName: opportunity.projectName,
+    color: opportunity.color,
+    stage: opportunity.stage,
+    probability: opportunity.probability,
+    notes: opportunity.notes,
+    startDate: opportunity.startDate.toISOString(),
+    endDate: opportunity.endDate.toISOString(),
+    estimatedValue: opportunity.estimatedValue?.toString() ?? null,
+    requiredSkills: opportunity.requiredSkills.map((item) => item.skill.name),
+    scenarios: opportunity.scenarios.map((scenario) => ({
+      id: scenario.id,
+      name: scenario.name,
+      isDefault: scenario.isDefault,
+      fitScore: scenario.fitScore,
+      burnoutImpact: scenario.burnoutImpact,
+      tentativeAssignments: scenario.tentativeAssignments.map((assignment) => ({
+        id: assignment.id,
+        consultantName: assignment.consultant.name,
+        role: assignment.role,
+        startDate: assignment.startDate.toISOString(),
+        endDate: assignment.endDate.toISOString(),
+      })),
+    })),
+  };
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/60">
@@ -81,12 +107,12 @@ export default async function OpportunityDetailPage({
             <div className="flex items-start gap-3">
               <span
                 className="mt-1 h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: opportunity.color }}
+                style={{ backgroundColor: safeOpportunity.color }}
               />
               <div className="space-y-1">
-                <p className="text-sm text-slate-500">{opportunity.clientName}</p>
+                <p className="text-sm text-slate-500">{safeOpportunity.clientName}</p>
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  {opportunity.projectName}
+                  {safeOpportunity.projectName}
                 </h1>
                 <p className="text-sm text-slate-600">
                   Opportunity Detail / Scenario Editor
@@ -97,19 +123,15 @@ export default async function OpportunityDetailPage({
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${PIPELINE_STAGE_BADGE_CLASSES[opportunity.stage]}`}
+              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${PIPELINE_STAGE_BADGE_CLASSES[safeOpportunity.stage]}`}
             >
-              {PIPELINE_STAGE_LABELS[opportunity.stage]}
+              {PIPELINE_STAGE_LABELS[safeOpportunity.stage]}
             </span>
             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              {opportunity.probability}% probability
+              {safeOpportunity.probability}% probability
             </span>
             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              {formatCurrency(
-                opportunity.estimatedValue !== null
-                  ? Number(opportunity.estimatedValue)
-                  : null
-              )}
+              {formatCurrency(safeOpportunity.estimatedValue)}
             </span>
           </div>
         </div>
@@ -121,7 +143,7 @@ export default async function OpportunityDetailPage({
                 Opportunity Overview
               </h2>
               <span className="text-sm text-slate-500">
-                {PIPELINE_STAGE_LABELS[opportunity.stage]}
+                {PIPELINE_STAGE_LABELS[safeOpportunity.stage]}
               </span>
             </div>
 
@@ -131,7 +153,7 @@ export default async function OpportunityDetailPage({
                   Start Date
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {formatDateOnly(opportunity.startDate)}
+                  {formatDateOnly(safeOpportunity.startDate)}
                 </p>
               </div>
               <div className="rounded-xl border bg-slate-50 p-4">
@@ -139,7 +161,7 @@ export default async function OpportunityDetailPage({
                   End Date
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {formatDateOnly(opportunity.endDate)}
+                  {formatDateOnly(safeOpportunity.endDate)}
                 </p>
               </div>
               <div className="rounded-xl border bg-slate-50 p-4">
@@ -147,8 +169,8 @@ export default async function OpportunityDetailPage({
                   Required Skills
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {requiredSkills.length > 0 ? (
-                    requiredSkills.map((skill) => (
+                  {safeOpportunity.requiredSkills.length > 0 ? (
+                    safeOpportunity.requiredSkills.map((skill) => (
                       <span
                         key={skill}
                         className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
@@ -166,7 +188,7 @@ export default async function OpportunityDetailPage({
                   Notes
                 </p>
                 <p className="mt-2 text-sm text-slate-700">
-                  {opportunity.notes?.trim() || 'No notes added yet.'}
+                  {safeOpportunity.notes?.trim() || 'No notes added yet.'}
                 </p>
               </div>
             </div>
@@ -187,7 +209,7 @@ export default async function OpportunityDetailPage({
                   Opportunity ID
                 </p>
                 <p className="mt-2 break-all text-sm font-medium text-slate-900">
-                  {opportunity.id}
+                  {safeOpportunity.id}
                 </p>
               </div>
               <div className="rounded-xl border bg-slate-50 p-4">
@@ -195,7 +217,7 @@ export default async function OpportunityDetailPage({
                   Scenario Count
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {opportunity.scenarios.length}
+                  {safeOpportunity.scenarios.length}
                 </p>
               </div>
             </div>
@@ -208,20 +230,20 @@ export default async function OpportunityDetailPage({
               Scenario Editor Scaffold
             </h2>
             <span className="text-sm text-slate-500">
-              {opportunity.scenarios.length === 1
+              {safeOpportunity.scenarios.length === 1
                 ? '1 scenario loaded'
-                : `${opportunity.scenarios.length} scenarios loaded`}
+                : `${safeOpportunity.scenarios.length} scenarios loaded`}
             </span>
           </div>
 
-          {opportunity.scenarios.length === 0 ? (
+          {safeOpportunity.scenarios.length === 0 ? (
             <div className="mt-5 rounded-xl border border-dashed bg-slate-50 p-6 text-sm text-slate-600">
               No scenarios exist for this opportunity yet. The route is ready for
               scenario creation and editing without crashing.
             </div>
           ) : (
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              {opportunity.scenarios.map((scenario) => (
+              {safeOpportunity.scenarios.map((scenario) => (
                 <article
                   key={scenario.id}
                   className="rounded-xl border bg-slate-50 p-5"
@@ -274,7 +296,7 @@ export default async function OpportunityDetailPage({
                             key={assignment.id}
                             className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
                           >
-                            <span>{assignment.consultant.name}</span>
+                            <span>{assignment.consultantName}</span>
                             <span className="text-xs uppercase tracking-wide text-slate-500">
                               {assignment.role}
                             </span>
