@@ -45,6 +45,7 @@ export function AppSidebar() {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [actualOpen, setActualOpen] = useState(true);
+  const [potentialOpen, setPotentialOpen] = useState(true);
 
   const handleLogout = () => {
     logout();
@@ -145,6 +146,33 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          )}
+        </SidebarGroup>
+
+        {/* Potential group */}
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className="cursor-pointer select-none"
+            onClick={() => setPotentialOpen(!potentialOpen)}
+          >
+            <span className="text-[10px] mr-1.5 text-muted-foreground">{potentialOpen ? '▾' : '▸'}</span>
+            Potential
+          </SidebarGroupLabel>
+          {potentialOpen && (
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={activeView === 'known-bets'}
+                    onClick={() => { setActiveView('known-bets'); router.push('/known-bets'); }}
+                    className="gap-3"
+                  >
+                    <span className="text-base">▦</span>
+                    <span>Known + Bets</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           )}

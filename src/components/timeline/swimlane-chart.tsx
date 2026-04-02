@@ -370,6 +370,7 @@ export function SwimLaneChart() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const activeView = useUIStore((s) => s.activeView);
   const isActualTimeline = activeView === 'actual-timeline';
+  const isKnownBets = activeView === 'known-bets';
   const rawOverlayPref = useUIStore((s) => s.showOpportunityOverlay);
   // Actual timeline: never show overlay. Other views: respect user preference.
   const showOpportunityOverlay = rawOverlayPref && !isActualTimeline;
@@ -405,13 +406,80 @@ export function SwimLaneChart() {
     [visibleConsultants]
   );
 
-  const visibleAssignments = useMemo(() => {
-    if (!practiceAreaFilter) {
-      return assignments;
+  // ─── Synthetic bet assignments for Known + Bets view ──────────────
+  const betAssignments = useMemo(() => {
+    if (!isKnownBets) return [] as Assignment[];
+
+    const betOpps = opportunities.filter((o) => o.is_bet && !['won', 'lost'].includes(o.stage));
+    const synthetic: Assignment[] = [];
+
+    for (const opp of betOpps) {
+      const scenario =
+        oppScenarios.find((s) => s.opportunity_id === opp.id && s.is_default) ||
+        oppScenarios.find((s) => s.opportunity_id === opp.id);
+
+      if (scenario) {
+        for (const ta of scenario.tentative_assignments) {
+          synthetic.push({
+            id: `bet:${ta.id}`,
+            consultant_id: ta.consultant_id,
+            engagement_id: `bet-opp:${opp.id}`,
+            role: ta.role,
+            start_date: ta.start_date,
+            end_date: ta.end_date,
+            allocation_percentage: ta.allocation_percentage,
+          });
+        }
+      } else {
+        // No scenario — create a full-width placeholder per opportunity
+        // (won't show on consultant lanes since no consultant_id mapping)
+      }
     }
 
-    return assignments.filter((assignment) => visibleConsultantIds.has(assignment.consultant_id));
-  }, [assignments, practiceAreaFilter, visibleConsultantIds]);
+    return synthetic;
+  }, [isKnownBets, opportunities, oppScenarios]);
+
+  // Map of bet assignment IDs to their opportunity metadata (for rendering)
+  const betMetadata = useMemo(() => {
+    if (!isKnownBets) return new Map<string, { color: string; clientName: string; projectName: string; probability: number }>();
+
+    const map = new Map<string, { color: string; clientName: string; projectName: string; probability: number }>();
+    const betOpps = opportunities.filter((o) => o.is_bet && !['won', 'lost'].includes(o.stage));
+
+    for (const opp of betOpps) {
+      const scenario =
+        oppScenarios.find((s) => s.opportunity_id === opp.id && s.is_default) ||
+        oppScenarios.find((s) => s.opportunity_id === opp.id);
+
+      if (scenario) {
+        for (const ta of scenario.tentative_assignments) {
+          map.set(`bet:${ta.id}`, {
+            color: opp.color,
+            clientName: opp.client_name,
+            projectName: opp.project_name,
+            probability: opp.probability,
+          });
+        }
+      }
+    }
+
+    return map;
+  }, [isKnownBets, opportunities, oppScenarios]);
+
+  // Merge real assignments with bet synthetic assignments
+  const allAssignments = useMemo(() => {
+    if (!isKnownBets || betAssignments.length === 0) return assignments;
+    return [...assignments, ...betAssignments];
+  }, [assignments, betAssignments, isKnownBets]);
+
+  const visibleAssignments = useMemo(() => {
+    const source = isKnownBets ? allAssignments : assignments;
+    if (!practiceAreaFilter) {
+      return source;
+    }
+
+    return source.filter((assignment) => visibleConsultantIds.has(assignment.consultant_id));
+  }, [allAssignments, assignments, isKnownBets, practiceAreaFilter, visibleConsultantIds]);
 
   const burnoutByConsultantId = useMemo(() => {
     const burnoutMap = new Map<string, number>();
@@ -787,11 +855,14 @@ export function SwimLaneChart() {
         }
 
         for (const assignment of lane.assignments) {
-          const engagement = engagementById.get(assignment.engagement_id);
+          const isBetAssignment = assignment.id.startsWith('bet:');
+          const engagement = isBetAssignment ? null : engagementById.get(assignment.engagement_id);
+          const betMeta = isBetAssignment ? betMetadata.get(assignment.id) : null;
           const consultant = consultantById.get(assignment.consultant_id);
           const assignmentLayout = laneLayout.assignmentLayouts.get(assignment.id);
 
-          if (!engagement || !assignmentLayout) {
+          // Skip real assignments with no engagement, but allow bet assignments
+          if (!assignmentLayout || (!engagement && !betMeta)) {
             continue;
           }
 
@@ -800,84 +871,224 @@ export function SwimLaneChart() {
           const width = Math.max(MIN_BLOCK_WIDTH, x2 - x);
           const blockY = laneY + BLOCK_PADDING + assignmentLayout.yOffset;
           const blockHeight = assignmentLayout.height;
-          const blockGroup = svg.append('g').attr('class', 'engagement-block');
-          const opacity = 0.92;
-          const primaryLabel =
-            viewMode === 'projects'
-              ? consultant
-                ? width > 152
-                  ? `${consultant.name} — ${consultant.role}`
-                  : consultant.name
-                : 'Unassigned consultant'
-              : width > 152
-                ? `${engagement.client_name} — ${engagement.project_name}`
-                : engagement.client_name;
+          const blockColor = isBetAssignment ? (betMeta?.color ?? '#7C3AED') : engagement!.color;
 
-          blockGroup
-            .append('rect')
-            .attr('x', x + 2)
-            .attr('y', blockY)
-            .attr('width', width - 4)
-            .attr('height', blockHeight)
-            .attr('rx', 6)
-            .attr('ry', 6)
-            .attr('fill', engagement.color)
-            .attr('opacity', opacity)
-            .attr('cursor', 'pointer')
-            .attr('filter', 'url(#block-shadow)')
-            .on('mouseenter', function () {
-              d3.select(this)
-                .transition()
-                .duration(150)
-                .attr('opacity', Math.min(1, opacity + 0.08))
-                .attr('stroke', 'rgba(255,255,255,0.85)')
-                .attr('stroke-width', 1.5);
-            })
-            .on('mouseleave', function () {
-              d3.select(this)
-                .transition()
-                .duration(150)
-                .attr('opacity', opacity)
-                .attr('stroke-width', 0);
-            })
-            .on('click', () => {
-              setSelectedEngagement(engagement.id);
-              setDrawerOpen(true);
-            });
+          if (isBetAssignment && betMeta) {
+            // ─── BET BLOCK: Distinct visual treatment ────────────────────
+            const betGroup = svg.append('g').attr('class', 'bet-block');
 
-          if (width > 60 && blockHeight >= 14) {
-            appendTruncatedText(blockGroup, {
-              fill: 'white',
-              fontSize: blockHeight >= 20 ? '11px' : '10px',
-              fontWeight: '500',
-              maxWidth: width - 20,
-              text: primaryLabel,
-              x: x + 10,
-              y: blockHeight >= 24 ? blockY + 12 : blockY + blockHeight / 2 + 1,
-            });
-          }
+            // Ensure bet stripe pattern exists in defs
+            let defs = svg.select<SVGDefsElement>('defs');
+            if (defs.empty()) {
+              defs = svg.append('defs');
+            }
+            const patternId = `bet-stripes-${betMeta.color.replace('#', '')}`;
+            if (defs.select(`#${patternId}`).empty()) {
+              const pattern = defs
+                .append('pattern')
+                .attr('id', patternId)
+                .attr('width', 8)
+                .attr('height', 8)
+                .attr('patternUnits', 'userSpaceOnUse')
+                .attr('patternTransform', 'rotate(45)');
+              pattern
+                .append('rect')
+                .attr('width', 8)
+                .attr('height', 8)
+                .attr('fill', betMeta.color)
+                .attr('fill-opacity', 0.18);
+              pattern
+                .append('line')
+                .attr('x1', 0)
+                .attr('y1', 0)
+                .attr('x2', 0)
+                .attr('y2', 8)
+                .attr('stroke', betMeta.color)
+                .attr('stroke-width', 3)
+                .attr('stroke-opacity', 0.28);
+            }
 
-          if (width > 112 && blockHeight >= 22) {
+            // Background fill — muted version of the bet color
+            betGroup
+              .append('rect')
+              .attr('x', x + 2)
+              .attr('y', blockY)
+              .attr('width', width - 4)
+              .attr('height', blockHeight)
+              .attr('rx', 6)
+              .attr('ry', 6)
+              .attr('fill', betMeta.color)
+              .attr('fill-opacity', 0.12);
+
+            // Diagonal stripe overlay
+            betGroup
+              .append('rect')
+              .attr('x', x + 2)
+              .attr('y', blockY)
+              .attr('width', width - 4)
+              .attr('height', blockHeight)
+              .attr('rx', 6)
+              .attr('ry', 6)
+              .attr('fill', `url(#${patternId})`);
+
+            // Dashed border
+            betGroup
+              .append('rect')
+              .attr('x', x + 2)
+              .attr('y', blockY)
+              .attr('width', width - 4)
+              .attr('height', blockHeight)
+              .attr('rx', 6)
+              .attr('ry', 6)
+              .attr('fill', 'none')
+              .attr('stroke', betMeta.color)
+              .attr('stroke-width', 1.5)
+              .attr('stroke-dasharray', '6,3')
+              .attr('stroke-opacity', 0.65);
+
+            // "BET" tag — small pill in top-right corner
+            if (width > 50 && blockHeight >= 16) {
+              const tagWidth = 28;
+              const tagHeight = 12;
+              const tagX = x + width - tagWidth - 8;
+              const tagY = blockY + 4;
+
+              betGroup
+                .append('rect')
+                .attr('x', tagX)
+                .attr('y', tagY)
+                .attr('width', tagWidth)
+                .attr('height', tagHeight)
+                .attr('rx', tagHeight / 2)
+                .attr('ry', tagHeight / 2)
+                .attr('fill', betMeta.color)
+                .attr('fill-opacity', 0.85);
+
+              betGroup
+                .append('text')
+                .attr('x', tagX + tagWidth / 2)
+                .attr('y', tagY + tagHeight / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'white')
+                .attr('font-size', '7px')
+                .attr('font-weight', '700')
+                .attr('letter-spacing', '0.5px')
+                .attr('pointer-events', 'none')
+                .text('BET');
+            }
+
+            // Primary label
+            if (width > 60 && blockHeight >= 14) {
+              const betLabel = width > 152
+                ? `${betMeta.clientName} — ${betMeta.projectName}`
+                : betMeta.clientName;
+
+              appendTruncatedText(betGroup, {
+                fill: betMeta.color,
+                fontSize: blockHeight >= 20 ? '11px' : '10px',
+                fontWeight: '600',
+                maxWidth: width - (width > 50 && blockHeight >= 16 ? 44 : 16),
+                text: betLabel,
+                x: x + 10,
+                y: blockHeight >= 24 ? blockY + 12 : blockY + blockHeight / 2 + 1,
+              });
+            }
+
+            // Allocation label
+            if (width > 112 && blockHeight >= 28) {
+              betGroup
+                .append('text')
+                .attr('x', x + 10)
+                .attr('y', blockY + blockHeight - 6)
+                .attr('fill', betMeta.color)
+                .attr('fill-opacity', 0.7)
+                .attr('font-size', '9px')
+                .attr('font-weight', '500')
+                .attr('pointer-events', 'none')
+                .text(`${assignment.allocation_percentage}% · ${betMeta.probability}% prob`);
+            }
+          } else if (engagement) {
+            // ─── REAL BLOCK: Standard rendering ──────────────────────────
+            const blockGroup = svg.append('g').attr('class', 'engagement-block');
+            const opacity = 0.92;
+            const primaryLabel =
+              viewMode === 'projects'
+                ? consultant
+                  ? width > 152
+                    ? `${consultant.name} — ${consultant.role}`
+                    : consultant.name
+                  : 'Unassigned consultant'
+                : width > 152
+                  ? `${engagement.client_name} — ${engagement.project_name}`
+                  : engagement.client_name;
+
             blockGroup
-              .append('text')
-              .attr('x', x + width - 8)
-              .attr('y', blockY + 12)
-              .attr('text-anchor', 'end')
-              .attr('fill', 'rgba(255,255,255,0.82)')
-              .attr('font-size', '9px')
-              .attr('font-weight', '600')
-              .attr('pointer-events', 'none')
-              .text(formatAllocationAsManDays(assignment.allocation_percentage, 'compact'));
-          }
+              .append('rect')
+              .attr('x', x + 2)
+              .attr('y', blockY)
+              .attr('width', width - 4)
+              .attr('height', blockHeight)
+              .attr('rx', 6)
+              .attr('ry', 6)
+              .attr('fill', blockColor)
+              .attr('opacity', opacity)
+              .attr('cursor', 'pointer')
+              .attr('filter', 'url(#block-shadow)')
+              .on('mouseenter', function () {
+                d3.select(this)
+                  .transition()
+                  .duration(150)
+                  .attr('opacity', Math.min(1, opacity + 0.08))
+                  .attr('stroke', 'rgba(255,255,255,0.85)')
+                  .attr('stroke-width', 1.5);
+              })
+              .on('mouseleave', function () {
+                d3.select(this)
+                  .transition()
+                  .duration(150)
+                  .attr('opacity', opacity)
+                  .attr('stroke-width', 0);
+              })
+              .on('click', () => {
+                setSelectedEngagement(engagement.id);
+                setDrawerOpen(true);
+              });
 
-          appendEffortMeter(
-            blockGroup,
-            x,
-            blockY,
-            width,
-            blockHeight,
-            assignment.allocation_percentage
-          );
+            if (width > 60 && blockHeight >= 14) {
+              appendTruncatedText(blockGroup, {
+                fill: 'white',
+                fontSize: blockHeight >= 20 ? '11px' : '10px',
+                fontWeight: '500',
+                maxWidth: width - 20,
+                text: primaryLabel,
+                x: x + 10,
+                y: blockHeight >= 24 ? blockY + 12 : blockY + blockHeight / 2 + 1,
+              });
+            }
+
+            if (width > 112 && blockHeight >= 22) {
+              blockGroup
+                .append('text')
+                .attr('x', x + width - 8)
+                .attr('y', blockY + 12)
+                .attr('text-anchor', 'end')
+                .attr('fill', 'rgba(255,255,255,0.82)')
+                .attr('font-size', '9px')
+                .attr('font-weight', '600')
+                .attr('pointer-events', 'none')
+                .text(formatAllocationAsManDays(assignment.allocation_percentage, 'compact'));
+            }
+
+            appendEffortMeter(
+              blockGroup,
+              x,
+              blockY,
+              width,
+              blockHeight,
+              assignment.allocation_percentage
+            );
+          }
         }
 
         currentY += laneHeight;
@@ -897,6 +1108,7 @@ export function SwimLaneChart() {
     weeks,
     setDrawerOpen,
     setSelectedEngagement,
+    betMetadata,
   ]);
 
   // ─── Opportunity Overlay (additive, separate render pass) ──────────────
@@ -1096,7 +1308,21 @@ export function SwimLaneChart() {
           >
             Today
           </Button>
-          {viewMode === 'consultants' && (
+          {isKnownBets && viewMode === 'consultants' ? (
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-2.5 rounded-sm bg-indigo-500 opacity-90" />
+                <span className="text-[10px] text-muted-foreground">Known</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-2.5 rounded-sm border border-dashed border-violet-500 bg-violet-500/15" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(139,92,246,0.15) 2px, rgba(139,92,246,0.15) 4px)' }} />
+                <span className="text-[10px] text-muted-foreground">Bet</span>
+              </div>
+              <span className="text-[10px] text-violet-600 font-medium">
+                {opportunities.filter((o) => o.is_bet && !['won', 'lost'].includes(o.stage)).length} bet{opportunities.filter((o) => o.is_bet && !['won', 'lost'].includes(o.stage)).length !== 1 ? 's' : ''} overlaid
+              </span>
+            </div>
+          ) : viewMode === 'consultants' && !isKnownBets ? (
             <div className="flex items-center gap-1.5 ml-auto">
               <Switch
                 id="opp-overlay"
@@ -1112,7 +1338,7 @@ export function SwimLaneChart() {
                 Show Pipeline
               </Label>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
