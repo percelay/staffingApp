@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,12 @@ import type { Assignment } from '@/lib/types/assignment';
 import type { Consultant } from '@/lib/types/consultant';
 import { PRACTICE_AREA_LABELS, SENIORITY_LABELS } from '@/lib/types/consultant';
 import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
-import { datesOverlap, getWeekLabel, isWithinRange } from '@/lib/utils/date-helpers';
+import {
+  datesOverlap,
+  formatIsoDate,
+  getWeekLabel,
+  isWithinRange,
+} from '@/lib/utils/date-helpers';
 import { cn } from '@/lib/utils';
 
 export interface StaffingWindow {
@@ -382,7 +387,7 @@ function ExpandedStaffingConsultantDetail({
         <DetailMetricCard
           label="Average availability"
           value={`${averageAvailability}%`}
-          detail={`${format(parseISO(staffingWindow.startDate), 'MMM d')} - ${format(parseISO(staffingWindow.endDate), 'MMM d')}`}
+          detail={`${formatIsoDate(staffingWindow.startDate, 'MMM d')} - ${formatIsoDate(staffingWindow.endDate, 'MMM d')}`}
         />
       </div>
 

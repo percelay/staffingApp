@@ -86,6 +86,19 @@ export function dateToISO(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+export function formatIsoDate(
+  value: string,
+  pattern: string = 'MMM d, yyyy',
+  fallback: string = '--'
+): string {
+  const parsed = parseISO(value);
+  if (!isValid(parsed)) {
+    return fallback;
+  }
+
+  return format(parsed, pattern);
+}
+
 export function datesOverlap(
   aStart: string,
   aEnd: string,

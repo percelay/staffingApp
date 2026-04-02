@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,7 @@ import {
   PIPELINE_STAGE_BADGE_CLASSES,
 } from '@/lib/types/opportunity';
 import { getCapacityConflicts } from '@/lib/utils/impact';
-import { getWeekCount } from '@/lib/utils/date-helpers';
+import { formatIsoDate, getWeekCount } from '@/lib/utils/date-helpers';
 import { ScenarioEditor } from './scenario-editor';
 import { ScenarioComparison } from './scenario-comparison';
 import { CreateOpportunityDialog } from './create-opportunity-dialog';
@@ -175,12 +174,12 @@ export function OpportunityDetail({
           </AttrPill>
           <AttrPill label="Start">
             <span className="text-sm font-medium">
-              {format(parseISO(opportunity.start_date), 'MMM d, yyyy')}
+              {formatIsoDate(opportunity.start_date)}
             </span>
           </AttrPill>
           <AttrPill label="End">
             <span className="text-sm font-medium">
-              {format(parseISO(opportunity.end_date), 'MMM d, yyyy')}
+              {formatIsoDate(opportunity.end_date)}
             </span>
           </AttrPill>
           <AttrPill label="Value">
