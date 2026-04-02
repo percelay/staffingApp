@@ -218,7 +218,7 @@ export function PotentialStaffingWorkspace({
         </ScrollArea>
       </div>
 
-      <div className="min-h-0 flex-1 bg-slate-50/30">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30">
         {selectedId ? (
           <OpportunityDetail
             opportunityId={selectedId}

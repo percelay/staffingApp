@@ -114,8 +114,60 @@ export function OpportunityDetail({
     router.push('/opportunities');
   };
 
+  const scenarioDetailContent = activeScenario ? (
+    <div className="p-6 space-y-6">
+      {conflicts.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-amber-800">
+            {conflicts.length} capacity{' '}
+            {conflicts.length === 1 ? 'conflict' : 'conflicts'} detected
+          </p>
+          <p className="text-[11px] text-amber-700 mt-0.5">
+            Some consultants would be overallocated if this
+            opportunity wins with this team.
+          </p>
+        </div>
+      )}
+
+      <ScenarioEditor
+        scenario={activeScenario}
+        opportunity={opportunity}
+        consultants={consultants}
+        assignments={assignments}
+        signals={signals}
+      />
+
+      {scenarios.length > 1 && (
+        <>
+          <Separator />
+          <ScenarioComparison
+            scenarios={scenarios}
+            opportunity={opportunity}
+            consultants={consultants}
+            assignments={assignments}
+            signals={signals}
+            activeScenarioId={activeScenarioId}
+            onSelectScenario={setActiveScenarioId}
+          />
+        </>
+      )}
+    </div>
+  ) : (
+    <div className="flex items-center justify-center h-40">
+      <p className="text-sm text-muted-foreground">
+        Create a scenario to start planning the team
+      </p>
+    </div>
+  );
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+    <div
+      className={
+        embedded
+          ? 'flex min-h-full flex-col'
+          : 'flex-1 flex min-h-0 flex-col overflow-hidden'
+      }
+    >
       {/* Header */}
       <div className="px-6 py-4 border-b bg-white">
         <div className="flex items-start justify-between">
@@ -212,9 +264,21 @@ export function OpportunityDetail({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div
+        className={
+          embedded
+            ? 'flex flex-col'
+            : 'flex-1 flex min-h-0 overflow-hidden'
+        }
+      >
         {/* Scenario tabs + editor */}
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div
+          className={
+            embedded
+              ? 'flex flex-col'
+              : 'flex-1 flex min-h-0 flex-col overflow-hidden'
+          }
+        >
           {/* Scenario tabs */}
           <div className="flex items-center gap-2 px-6 py-2 border-b bg-slate-50/50">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">
@@ -259,54 +323,13 @@ export function OpportunityDetail({
           </div>
 
           {/* Scenario editor */}
-          <ScrollArea className="flex-1 min-h-0">
-            {activeScenario ? (
-              <div className="p-6 space-y-6">
-                {conflicts.length > 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-xs font-semibold text-amber-800">
-                      {conflicts.length} capacity{' '}
-                      {conflicts.length === 1 ? 'conflict' : 'conflicts'}{' '}
-                      detected
-                    </p>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
-                      Some consultants would be overallocated if this
-                      opportunity wins with this team.
-                    </p>
-                  </div>
-                )}
-
-                <ScenarioEditor
-                  scenario={activeScenario}
-                  opportunity={opportunity}
-                  consultants={consultants}
-                  assignments={assignments}
-                  signals={signals}
-                />
-
-                {scenarios.length > 1 && (
-                  <>
-                    <Separator />
-                    <ScenarioComparison
-                      scenarios={scenarios}
-                      opportunity={opportunity}
-                      consultants={consultants}
-                      assignments={assignments}
-                      signals={signals}
-                      activeScenarioId={activeScenarioId}
-                      onSelectScenario={setActiveScenarioId}
-                    />
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-40">
-                <p className="text-sm text-muted-foreground">
-                  Create a scenario to start planning the team
-                </p>
-              </div>
-            )}
-          </ScrollArea>
+          {embedded ? (
+            scenarioDetailContent
+          ) : (
+            <ScrollArea className="flex-1 min-h-0">
+              {scenarioDetailContent}
+            </ScrollArea>
+          )}
         </div>
       </div>
 
