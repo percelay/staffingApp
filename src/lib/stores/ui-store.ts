@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import type { PracticeArea } from '../types';
 
-export type ActiveView = 'actual-timeline' | 'actual-staffing' | 'actual-people' | 'opportunities' | 'known-bets';
+export type ActiveView =
+  | 'actual-timeline'
+  | 'actual-staffing'
+  | 'actual-people'
+  | 'opportunities'
+  | 'potential-staffing'
+  | 'known-bets';
 
 interface UIStore {
   activeView: ActiveView;

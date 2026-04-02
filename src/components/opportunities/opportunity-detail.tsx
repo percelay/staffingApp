@@ -18,18 +18,21 @@ import {
   PIPELINE_STAGE_BADGE_CLASSES,
 } from '@/lib/types/opportunity';
 import { getCapacityConflicts } from '@/lib/utils/impact';
-import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getStatusColor } from '@/lib/utils/colors';
-import { formatAllocationAsManDays } from '@/lib/utils/allocation';
 import { ScenarioEditor } from './scenario-editor';
 import { ScenarioComparison } from './scenario-comparison';
 import { CreateOpportunityDialog } from './create-opportunity-dialog';
 
 interface Props {
   opportunityId: string;
+  embedded?: boolean;
+  onDeleted?: () => void;
 }
 
-export function OpportunityDetail({ opportunityId }: Props) {
+export function OpportunityDetail({
+  opportunityId,
+  embedded = false,
+  onDeleted,
+}: Props) {
   const router = useRouter();
   const opportunity = useOpportunityStore((s) => s.getById(opportunityId));
   const scenarios = useOpportunityStore((s) =>
@@ -51,7 +54,10 @@ export function OpportunityDetail({ opportunityId }: Props) {
 
   // Auto-select first scenario
   useEffect(() => {
-    if (scenarios.length > 0 && !activeScenarioId) {
+    if (
+      scenarios.length > 0 &&
+      (!activeScenarioId || !scenarios.some((scenario) => scenario.id === activeScenarioId))
+    ) {
       const defaultScenario =
         scenarios.find((s) => s.is_default) || scenarios[0];
       setActiveScenarioId(defaultScenario.id);
@@ -96,6 +102,10 @@ export function OpportunityDetail({ opportunityId }: Props) {
 
   const handleDelete = async () => {
     await removeOpportunity(opportunityId);
+    if (embedded) {
+      onDeleted?.();
+      return;
+    }
     router.push('/opportunities');
   };
 
@@ -105,13 +115,15 @@ export function OpportunityDetail({ opportunityId }: Props) {
       <div className="px-6 py-4 border-b bg-white">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/opportunities')}
-            >
-              ← Pipeline
-            </Button>
+            {!embedded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/opportunities')}
+              >
+                ← Pipeline
+              </Button>
+            )}
             <div
               className="w-4 h-4 rounded-full mt-1 shrink-0"
               style={{ backgroundColor: opportunity.color }}

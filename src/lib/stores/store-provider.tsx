@@ -64,14 +64,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         useAssignmentStore.getState().setAssignments(assignments);
         useWellbeingStore.getState().setSignals(signals);
 
-        // Try to load opportunities from API; fall back to seed
+        // Try to load opportunities and scenarios from API; fall back to seed
         try {
-          const oppRes = await authFetch('/api/opportunities');
+          const [oppRes, scenarioRes] = await Promise.all([
+            authFetch('/api/opportunities'),
+            authFetch('/api/opportunities/scenarios'),
+          ]);
+
           if (oppRes.ok) {
             const opportunities = await oppRes.json();
             if (opportunities.length > 0) {
-              useOpportunityStore.getState().setOpportunities(opportunities);
-              console.log('[StoreProvider] Loaded from database API (with opportunities)');
+              const opportunityStore = useOpportunityStore.getState();
+              opportunityStore.setOpportunities(opportunities);
+
+              if (scenarioRes.ok) {
+                const scenarios = await scenarioRes.json();
+                opportunityStore.setScenarios(scenarios);
+              } else {
+                opportunityStore.setScenarios([]);
+              }
+
+              console.log(
+                '[StoreProvider] Loaded from database API (with opportunities)'
+              );
               return;
             }
           }

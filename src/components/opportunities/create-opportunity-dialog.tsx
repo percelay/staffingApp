@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { addWeeks, format, startOfWeek } from 'date-fns';
-import { createOpportunityAndRedirect } from '@/app/(dashboard)/opportunities/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,41 +17,102 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
+import { useConsultantStore } from '@/lib/stores/consultant-store';
+import { useEngagementStore } from '@/lib/stores/engagement-store';
+import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
-import {
-  PIPELINE_STAGE_LABELS,
-  ACTIVE_PIPELINE_STAGES,
-  type PipelineStage,
-  type Opportunity,
+import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import type {
+  Opportunity,
+  OpportunityCreateInput,
+  PipelineStage,
+  TentativeAssignmentInput,
 } from '@/lib/types/opportunity';
+import type { AssignmentRole } from '@/lib/types/assignment';
+import { PRACTICE_AREA_LABELS, type PracticeArea } from '@/lib/types/consultant';
+import {
+  ACTIVE_PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+} from '@/lib/types/opportunity';
+import { formatAllocationAsManDays, getCurrentConsultantUtilization } from '@/lib/utils/allocation';
+import { calculateBurnoutRisk } from '@/lib/utils/burnout';
+import { getStatusColor } from '@/lib/utils/colors';
+import { cn } from '@/lib/utils';
+import { AvailableStaffingConsultantCard } from '@/components/staffing/shared/staffing-consultant-picker';
 
 const ALL_SKILLS = [
-  'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
-  'Process Optimization', 'Digital Strategy', 'Stakeholder Management', 'Market Analysis',
-  'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
-  'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
-  'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
+  'Financial Modeling',
+  'Change Management',
+  'Data Analytics',
+  'Due Diligence',
+  'Process Optimization',
+  'Digital Strategy',
+  'Stakeholder Management',
+  'Market Analysis',
+  'Risk Assessment',
+  'Supply Chain',
+  'M&A Integration',
+  'Cost Reduction',
+  'Agile Transformation',
+  'Cloud Migration',
+  'People Analytics',
+  'Regulatory Compliance',
+  'Revenue Growth',
+  'Customer Experience',
+  'Organizational Design',
+  'Performance Management',
 ];
 
 const COLOR_PALETTE = [
-  '#6366F1', '#0891B2', '#059669', '#D97706',
-  '#DC2626', '#7C3AED', '#DB2777', '#2563EB',
-  '#EA580C', '#65A30D',
+  '#6366F1',
+  '#0891B2',
+  '#059669',
+  '#D97706',
+  '#DC2626',
+  '#7C3AED',
+  '#DB2777',
+  '#2563EB',
+  '#EA580C',
+  '#65A30D',
 ];
+
+interface DraftTentativeAssignment extends TentativeAssignmentInput {
+  id: string;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** If provided, pre-fills the form for editing */
   editingOpportunity?: Opportunity;
-  /** If provided, called after creating (instead of redirecting to detail page) */
   onCreated?: (opportunity: Opportunity) => void;
-  /** If provided, overrides the default stage for new opportunities */
   defaultStage?: PipelineStage;
+}
+
+function buildDefaultDates() {
+  const now = startOfWeek(new Date(), { weekStartsOn: 1 });
+  return {
+    startDate: format(addWeeks(now, 2), 'yyyy-MM-dd'),
+    endDate: format(addWeeks(now, 10), 'yyyy-MM-dd'),
+  };
+}
+
+function buildDraftAssignments(
+  assignments: TentativeAssignmentInput[] | undefined,
+  fallbackStartDate: string,
+  fallbackEndDate: string
+) {
+  return (assignments ?? []).map((assignment) => ({
+    id: crypto.randomUUID(),
+    consultant_id: assignment.consultant_id,
+    role: assignment.role,
+    start_date: assignment.start_date || fallbackStartDate,
+    end_date: assignment.end_date || fallbackEndDate,
+    allocation_percentage: assignment.allocation_percentage ?? 100,
+  }));
 }
 
 export function CreateOpportunityDialog({
@@ -62,27 +122,144 @@ export function CreateOpportunityDialog({
   onCreated,
   defaultStage,
 }: Props) {
-  const addOpportunity = useOpportunityStore((s) => s.addOpportunity);
-  const updateOpportunity = useOpportunityStore((s) => s.updateOpportunity);
+  const addOpportunity = useOpportunityStore((state) => state.addOpportunity);
+  const updateOpportunity = useOpportunityStore((state) => state.updateOpportunity);
+  const scenarios = useOpportunityStore((state) => state.scenarios);
+  const consultants = useConsultantStore((state) => state.consultants);
+  const engagements = useEngagementStore((state) => state.engagements);
+  const assignments = useAssignmentStore((state) => state.assignments);
+  const signals = useWellbeingStore((state) => state.signals);
+  const defaultScenario = editingOpportunity
+    ? scenarios.find(
+        (scenario) =>
+          scenario.opportunity_id === editingOpportunity.id && scenario.is_default
+      ) ?? scenarios.find((scenario) => scenario.opportunity_id === editingOpportunity.id)
+    : undefined;
   const isEditing = Boolean(editingOpportunity);
-  const [isCreating, startCreateTransition] = useTransition();
+  const defaultDates = buildDefaultDates();
 
-  const now = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const [clientName, setClientName] = useState(editingOpportunity?.client_name ?? '');
-  const [projectName, setProjectName] = useState(editingOpportunity?.project_name ?? '');
-  const [startDate, setStartDate] = useState(editingOpportunity?.start_date ?? format(addWeeks(now, 2), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(editingOpportunity?.end_date ?? format(addWeeks(now, 10), 'yyyy-MM-dd'));
-  const [stage, setStage] = useState<PipelineStage>(editingOpportunity?.stage ?? defaultStage ?? 'identified');
-  const [probability, setProbability] = useState(editingOpportunity?.probability ?? 25);
-  const [estimatedValue, setEstimatedValue] = useState(editingOpportunity?.estimated_value?.toString() ?? '');
-  const [color, setColor] = useState(editingOpportunity?.color ?? COLOR_PALETTE[0]);
-  const [requiredSkills, setRequiredSkills] = useState<string[]>(editingOpportunity?.required_skills ?? []);
-  const [isBet, setIsBet] = useState(editingOpportunity?.is_bet ?? false);
-  const [notes, setNotes] = useState(editingOpportunity?.notes ?? '');
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [startDate, setStartDate] = useState(defaultDates.startDate);
+  const [endDate, setEndDate] = useState(defaultDates.endDate);
+  const [stage, setStage] = useState<PipelineStage>(defaultStage ?? 'identified');
+  const [probability, setProbability] = useState(25);
+  const [estimatedValue, setEstimatedValue] = useState('');
+  const [color, setColor] = useState(COLOR_PALETTE[0]);
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
+  const [isBet, setIsBet] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [defaultTeam, setDefaultTeam] = useState<DraftTentativeAssignment[]>([]);
+  const [addingMember, setAddingMember] = useState(false);
+  const [expandedConsultantId, setExpandedConsultantId] = useState<string | null>(null);
+  const [newConsultantId, setNewConsultantId] = useState('');
+  const [newRole, setNewRole] = useState<AssignmentRole>('consultant');
+  const [newAllocation, setNewAllocation] = useState(100);
+  const [practiceFilter, setPracticeFilter] = useState<PracticeArea | 'all'>('all');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const nextStartDate =
+      editingOpportunity?.start_date ?? defaultDates.startDate;
+    const nextEndDate = editingOpportunity?.end_date ?? defaultDates.endDate;
+
+    setClientName(editingOpportunity?.client_name ?? '');
+    setProjectName(editingOpportunity?.project_name ?? '');
+    setStartDate(nextStartDate);
+    setEndDate(nextEndDate);
+    setStage(editingOpportunity?.stage ?? defaultStage ?? 'identified');
+    setProbability(editingOpportunity?.probability ?? 25);
+    setEstimatedValue(editingOpportunity?.estimated_value?.toString() ?? '');
+    setColor(editingOpportunity?.color ?? COLOR_PALETTE[0]);
+    setRequiredSkills(editingOpportunity?.required_skills ?? []);
+    setIsBet(editingOpportunity?.is_bet ?? false);
+    setNotes(editingOpportunity?.notes ?? '');
+    setDefaultTeam(
+      buildDraftAssignments(
+        defaultScenario?.tentative_assignments,
+        nextStartDate,
+        nextEndDate
+      )
+    );
+    setAddingMember(false);
+    setExpandedConsultantId(null);
+    setNewConsultantId('');
+    setNewRole('consultant');
+    setNewAllocation(100);
+    setPracticeFilter('all');
+  }, [open, editingOpportunity, defaultScenario, defaultStage, defaultDates.endDate, defaultDates.startDate]);
+
+  const availableConsultants = useMemo(
+    () => {
+      const assignedIds = new Set(
+        defaultTeam.map((assignment) => assignment.consultant_id)
+      );
+
+      return consultants.filter((consultant) => {
+        if (assignedIds.has(consultant.id)) return false;
+        if (
+          practiceFilter !== 'all' &&
+          consultant.practice_area !== practiceFilter
+        ) {
+          return false;
+        }
+        return true;
+      });
+    },
+    [consultants, defaultTeam, practiceFilter]
+  );
+
+  const totalAllocation = defaultTeam.reduce(
+    (sum, assignment) => sum + assignment.allocation_percentage,
+    0
+  );
+
+  const handleAddTeamMember = () => {
+    if (!newConsultantId) {
+      return;
+    }
+
+    setDefaultTeam((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        consultant_id: newConsultantId,
+        role: newRole,
+        start_date: startDate,
+        end_date: endDate,
+        allocation_percentage: newAllocation,
+      },
+    ]);
+    setNewConsultantId('');
+    setNewRole('consultant');
+    setNewAllocation(100);
+    setExpandedConsultantId(null);
+    setAddingMember(false);
+  };
+
+  const handleUpdateTeamMember = (
+    assignmentId: string,
+    data: Partial<DraftTentativeAssignment>
+  ) => {
+    setDefaultTeam((current) =>
+      current.map((assignment) =>
+        assignment.id === assignmentId ? { ...assignment, ...data } : assignment
+      )
+    );
+  };
+
+  const handleRemoveTeamMember = (assignmentId: string) => {
+    setDefaultTeam((current) =>
+      current.filter((assignment) => assignment.id !== assignmentId)
+    );
+  };
 
   const handleSubmit = async () => {
-    const data = {
+    const payload: OpportunityCreateInput = {
       client_name: clientName || 'New Client',
       project_name: projectName || 'New Opportunity',
       start_date: startDate,
@@ -92,211 +269,522 @@ export function CreateOpportunityDialog({
       estimated_value: estimatedValue ? Number(estimatedValue) : null,
       color,
       is_bet: isBet,
+      notes: notes.trim() || null,
       required_skills: requiredSkills,
-      notes: notes || null,
       converted_engagement_id: null,
+      default_scenario: {
+        name: defaultScenario?.name ?? 'Primary Team',
+        tentative_assignments: defaultTeam.map((assignment) => ({
+          consultant_id: assignment.consultant_id,
+          role: assignment.role,
+          start_date: startDate,
+          end_date: endDate,
+          allocation_percentage: assignment.allocation_percentage,
+        })),
+      },
     };
 
-    if (isEditing && editingOpportunity) {
-      setSavingEdit(true);
-      try {
-        await updateOpportunity(editingOpportunity.id, data);
-        onOpenChange(false);
-        resetForm();
-      } catch (e) {
-        console.error('Failed to save opportunity:', e);
-      } finally {
-        setSavingEdit(false);
+    setSaving(true);
+    try {
+      if (isEditing && editingOpportunity) {
+        await updateOpportunity(editingOpportunity.id, payload);
+      } else {
+        const created = await addOpportunity(payload);
+        onCreated?.(created);
       }
-      return;
-    }
-
-    if (onCreated) {
-      setSavingEdit(true);
-      try {
-        const created = await addOpportunity(data as Omit<Opportunity, 'id'>);
-        onOpenChange(false);
-        resetForm();
-        onCreated(created);
-      } catch (e) {
-        console.error('Failed to create opportunity:', e);
-      } finally {
-        setSavingEdit(false);
-      }
-    } else {
-      startCreateTransition(async () => {
-        await createOpportunityAndRedirect(data);
-      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to save opportunity:', error);
+    } finally {
+      setSaving(false);
     }
   };
-
-  const resetForm = () => {
-    setClientName('');
-    setProjectName('');
-    setStartDate(format(addWeeks(now, 2), 'yyyy-MM-dd'));
-    setEndDate(format(addWeeks(now, 10), 'yyyy-MM-dd'));
-    setStage('identified');
-    setProbability(25);
-    setEstimatedValue('');
-    setColor(COLOR_PALETTE[0]);
-    setIsBet(false);
-    setRequiredSkills([]);
-    setNotes('');
-  };
-
-  const isSaving = savingEdit || isCreating;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Opportunity' : 'New Opportunity'}
           </DialogTitle>
           <DialogDescription>
-            {isEditing
-              ? 'Update opportunity details.'
-              : 'Add a potential engagement to the pipeline.'}
+            Capture opportunity details and build the default staffing plan in one
+            place.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5 mt-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Client Name</Label>
-              <Input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="e.g. Acme Corp"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Project Name</Label>
-              <Input
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. M&A Due Diligence"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Expected Start</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Expected End</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-          </div>
+        <div className="mt-2 space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Client Name</Label>
+                  <Input
+                    value={clientName}
+                    onChange={(event) => setClientName(event.target.value)}
+                    placeholder="e.g. Acme Corp"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Project Name</Label>
+                  <Input
+                    value={projectName}
+                    onChange={(event) => setProjectName(event.target.value)}
+                    placeholder="e.g. M&A Due Diligence"
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Pipeline Stage</Label>
-              <Select
-                value={stage}
-                onValueChange={(v) => setStage(v as PipelineStage)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACTIVE_PIPELINE_STAGES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {PIPELINE_STAGE_LABELS[s]}
-                    </SelectItem>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Expected Start</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(event) => setStartDate(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Expected End</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(event) => setEndDate(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Pipeline Stage</Label>
+                  <Select
+                    value={stage}
+                    onValueChange={(value) => setStage(value as PipelineStage)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACTIVE_PIPELINE_STAGES.map((pipelineStage) => (
+                        <SelectItem key={pipelineStage} value={pipelineStage}>
+                          {PIPELINE_STAGE_LABELS[pipelineStage]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    Win Probability — {probability}%
+                  </Label>
+                  <Input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={probability}
+                    onChange={(event) =>
+                      setProbability(Number(event.target.value))
+                    }
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Estimated Value ($)</Label>
+                  <Input
+                    type="number"
+                    value={estimatedValue}
+                    onChange={(event) => setEstimatedValue(event.target.value)}
+                    placeholder="e.g. 500000"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Color</Label>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {COLOR_PALETTE.map((paletteColor) => (
+                    <button
+                      key={paletteColor}
+                      type="button"
+                      className={`h-6 w-6 rounded-md border-2 transition-all ${
+                        color === paletteColor
+                          ? 'scale-110 border-foreground'
+                          : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: paletteColor }}
+                      onClick={() => setColor(paletteColor)}
+                    />
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">
-                Win Probability — {probability}%
-              </Label>
-              <Input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={probability}
-                onChange={(e) => setProbability(Number(e.target.value))}
-                className="h-8"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Estimated Value ($)</Label>
-              <Input
-                type="number"
-                value={estimatedValue}
-                onChange={(e) => setEstimatedValue(e.target.value)}
-                placeholder="e.g. 500000"
-              />
-            </div>
-          </div>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs">Color</Label>
-            <div className="flex gap-1.5 flex-wrap pt-1">
-              {COLOR_PALETTE.map((c) => (
-                <button
-                  key={c}
-                  className={`w-6 h-6 rounded-md border-2 transition-all ${
-                    color === c
-                      ? 'border-foreground scale-110'
-                      : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">Bet</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Mark this opportunity as a strategic bet
+                  </p>
+                </div>
+                <Switch checked={isBet} onCheckedChange={setIsBet} />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Required Skills</Label>
+                <div className="max-h-28 overflow-y-auto rounded-md border p-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {ALL_SKILLS.map((skill) => (
+                      <Badge
+                        key={skill}
+                        variant={
+                          requiredSkills.includes(skill) ? 'default' : 'outline'
+                        }
+                        className="cursor-pointer text-xs transition-colors"
+                        onClick={() =>
+                          setRequiredSkills((current) =>
+                            current.includes(skill)
+                              ? current.filter((item) => item !== skill)
+                              : [...current, skill]
+                          )
+                        }
+                      >
+                        {requiredSkills.includes(skill) ? `${skill} x` : `+ ${skill}`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Notes</Label>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Context, partners, constraints, or client notes..."
+                  className="min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
-              ))}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label className="text-xs">Bet</Label>
-              <p className="text-xs text-muted-foreground">Mark this opportunity as a strategic bet</p>
-            </div>
-            <Switch checked={isBet} onCheckedChange={setIsBet} />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Required Skills</Label>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto border rounded-md p-3">
-              {ALL_SKILLS.map((skill) => (
-                <Badge
-                  key={skill}
-                  variant={requiredSkills.includes(skill) ? 'default' : 'outline'}
-                  className="cursor-pointer transition-colors text-xs"
-                  onClick={() =>
-                    setRequiredSkills((prev) =>
-                      prev.includes(skill)
-                        ? prev.filter((s) => s !== skill)
-                        : [...prev, skill]
-                    )
-                  }
+            <div className="space-y-4 rounded-xl border bg-slate-50/40 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Default Staffing ({defaultTeam.length})
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Team effort: {formatAllocationAsManDays(totalAllocation)}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (addingMember) {
+                      setExpandedConsultantId(null);
+                    }
+                    setAddingMember(!addingMember);
+                  }}
                 >
-                  {requiredSkills.includes(skill) ? skill + ' x' : '+ ' + skill}
-                </Badge>
-              ))}
+                  {addingMember ? 'Cancel' : '+ Add Consultant'}
+                </Button>
+              </div>
+
+              {addingMember && (
+                <div className="space-y-3 rounded-lg border bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Add Team Member</Label>
+                    <Select
+                      value={practiceFilter}
+                      onValueChange={(value) =>
+                        setPracticeFilter(value as PracticeArea | 'all')
+                      }
+                    >
+                      <SelectTrigger className="h-7 w-[140px] text-[11px]">
+                        <SelectValue placeholder="Filter..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Areas</SelectItem>
+                        {Object.entries(PRACTICE_AREA_LABELS).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="max-h-[320px] overflow-y-auto rounded-md border">
+                    {availableConsultants.length === 0 ? (
+                      <p className="py-4 text-center text-xs text-muted-foreground">
+                        No consultants available
+                      </p>
+                    ) : (
+                      availableConsultants.map((consultant) => (
+                        <AvailableStaffingConsultantCard
+                          key={consultant.id}
+                          consultant={consultant}
+                          staffingWindow={{
+                            projectName: projectName || 'New Opportunity',
+                            startDate,
+                            endDate,
+                            requiredSkills,
+                          }}
+                          allAssignments={assignments}
+                          allEngagements={engagements}
+                          isSelected={newConsultantId === consultant.id}
+                          isExpanded={expandedConsultantId === consultant.id}
+                          onSelect={() => {
+                            setNewConsultantId((currentId) =>
+                              currentId === consultant.id ? '' : consultant.id
+                            );
+                          }}
+                          onToggleExpand={() => {
+                            setExpandedConsultantId((currentId) =>
+                              currentId === consultant.id ? null : consultant.id
+                            );
+                          }}
+                        />
+                      ))
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Role</Label>
+                      <Select
+                        value={newRole}
+                        onValueChange={(value) =>
+                          setNewRole(value as AssignmentRole)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="lead">Lead</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="consultant">Consultant</SelectItem>
+                          <SelectItem value="analyst">Analyst</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        Allocation — {newAllocation}%{' '}
+                        <span className="text-muted-foreground">
+                          ({(newAllocation / 20).toFixed(1)}/5 days)
+                        </span>
+                      </Label>
+                      <Input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={10}
+                        value={newAllocation}
+                        onChange={(event) =>
+                          setNewAllocation(Number(event.target.value))
+                        }
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={handleAddTeamMember}
+                    disabled={!newConsultantId}
+                    className="w-full"
+                  >
+                    Add to Default Team
+                  </Button>
+                </div>
+              )}
+
+              {defaultTeam.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No consultants assigned yet
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">
+                    Click &quot;+ Add Consultant&quot; to build the initial staffing
+                    plan
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {defaultTeam.map((assignment) => {
+                    const consultant = consultants.find(
+                      (candidate) => candidate.id === assignment.consultant_id
+                    );
+                    if (!consultant) {
+                      return null;
+                    }
+
+                    const burnout = calculateBurnoutRisk(
+                      consultant.id,
+                      assignments,
+                      signals
+                    );
+                    const statusColor = getStatusColor(burnout);
+                    const currentUtilization = getCurrentConsultantUtilization(
+                      consultant.id,
+                      assignments
+                    );
+                    const projectedUtilization =
+                      currentUtilization + assignment.allocation_percentage;
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="space-y-3 rounded-lg border border-dashed border-slate-300 bg-white p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={consultant.avatar_url}
+                              alt={consultant.name}
+                              className="h-10 w-10 rounded-full bg-slate-100"
+                            />
+                            <div
+                              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white"
+                              style={{ backgroundColor: statusColor }}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {consultant.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {consultant.role} ·{' '}
+                              {PRACTICE_AREA_LABELS[consultant.practice_area]}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="border-dashed text-[10px]"
+                          >
+                            Tentative
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemoveTeamMember(assignment.id)}
+                          >
+                            x
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Role
+                            </Label>
+                            <Select
+                              value={assignment.role}
+                              onValueChange={(value) =>
+                                handleUpdateTeamMember(assignment.id, {
+                                  role: value as AssignmentRole,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="lead">Lead</SelectItem>
+                                <SelectItem value="manager">Manager</SelectItem>
+                                <SelectItem value="consultant">
+                                  Consultant
+                                </SelectItem>
+                                <SelectItem value="analyst">Analyst</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Allocation
+                            </Label>
+                            <div className="space-y-1">
+                              <div className="flex h-7 items-center justify-center rounded-md border text-xs font-medium">
+                                {assignment.allocation_percentage}%{' '}
+                                <span className="ml-1 text-muted-foreground">
+                                  (
+                                  {formatAllocationAsManDays(
+                                    assignment.allocation_percentage,
+                                    'compact'
+                                  )}
+                                  )
+                                </span>
+                              </div>
+                              <Input
+                                type="range"
+                                min={0}
+                                max={100}
+                                step={10}
+                                value={assignment.allocation_percentage}
+                                onChange={(event) =>
+                                  handleUpdateTeamMember(assignment.id, {
+                                    allocation_percentage: Number(
+                                      event.target.value
+                                    ),
+                                  })
+                                }
+                                className="h-7"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Current UR
+                            </Label>
+                            <div
+                              className={cn(
+                                'flex h-7 items-center justify-center rounded-md border text-xs font-bold',
+                                currentUtilization > 100
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : currentUtilization > 80
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-green-200 bg-green-50 text-green-700'
+                              )}
+                            >
+                              {currentUtilization}%
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Projected
+                            </Label>
+                            <div
+                              className={cn(
+                                'flex h-7 items-center justify-center rounded-md border border-dashed text-xs font-bold',
+                                projectedUtilization > 100
+                                  ? 'border-red-300 bg-red-50 text-red-700'
+                                  : projectedUtilization > 80
+                                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                    : 'border-green-300 bg-green-50 text-green-700'
+                              )}
+                            >
+                              {projectedUtilization}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button
-              onClick={handleSubmit}
-              disabled={isSaving}
-              className="flex-1"
-            >
-              {isSaving
+            <Button onClick={handleSubmit} disabled={saving} className="flex-1">
+              {saving
                 ? 'Saving...'
                 : isEditing
                   ? 'Save Changes'

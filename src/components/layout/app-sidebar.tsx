@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Sidebar,
@@ -33,6 +33,12 @@ const ACTUAL_ITEMS: NavItem[] = [
   { label: 'People', icon: '◎', view: 'actual-people', href: '/manage' },
 ];
 
+const POTENTIAL_ITEMS: NavItem[] = [
+  { label: 'Opportunities', icon: '◇', view: 'opportunities', href: '/opportunities' },
+  { label: 'Staffing', icon: '⊞', view: 'potential-staffing', href: '/potential/staffing' },
+  { label: 'Known + Bets', icon: '▦', view: 'known-bets', href: '/known-bets' },
+];
+
 const TOP_ITEMS = [
   { label: 'Executive', href: '/executive', icon: '◈' },
 ];
@@ -46,6 +52,22 @@ export function AppSidebar() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [actualOpen, setActualOpen] = useState(true);
   const [potentialOpen, setPotentialOpen] = useState(true);
+
+  useEffect(() => {
+    if (pathname.startsWith('/potential/staffing')) {
+      setActiveView('potential-staffing');
+    } else if (pathname.startsWith('/opportunities')) {
+      setActiveView('opportunities');
+    } else if (pathname.startsWith('/known-bets')) {
+      setActiveView('known-bets');
+    } else if (pathname.startsWith('/staffing')) {
+      setActiveView('actual-staffing');
+    } else if (pathname.startsWith('/manage')) {
+      setActiveView('actual-people');
+    } else if (pathname.startsWith('/timeline')) {
+      setActiveView('actual-timeline');
+    }
+  }, [pathname, setActiveView]);
 
   const handleLogout = () => {
     logout();
@@ -104,24 +126,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Opportunities */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeView === 'opportunities'}
-                  onClick={() => { setActiveView('opportunities'); router.push('/opportunities'); }}
-                  className="gap-3"
-                >
-                  <span className="text-base">◇</span>
-                  <span>Opportunities</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
         {/* Actual group */}
         <SidebarGroup>
           <SidebarGroupLabel
@@ -163,16 +167,18 @@ export function AppSidebar() {
           {potentialOpen && (
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={activeView === 'known-bets'}
-                    onClick={() => { setActiveView('known-bets'); router.push('/known-bets'); }}
-                    className="gap-3"
-                  >
-                    <span className="text-base">▦</span>
-                    <span>Known + Bets</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {POTENTIAL_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.view}>
+                    <SidebarMenuButton
+                      isActive={activeView === item.view}
+                      onClick={() => handleNav(item)}
+                      className="gap-3"
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           )}

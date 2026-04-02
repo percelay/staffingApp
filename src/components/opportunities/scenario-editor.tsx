@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,17 +13,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
+import { useEngagementStore } from '@/lib/stores/engagement-store';
 import type { Opportunity, Scenario } from '@/lib/types/opportunity';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
 import type { Assignment, AssignmentRole } from '@/lib/types/assignment';
 import type { WellbeingSignal } from '@/lib/types/wellbeing';
-import { SENIORITY_LABELS, PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
+import { PRACTICE_AREA_LABELS } from '@/lib/types/consultant';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getCurrentConsultantUtilization, formatAllocationAsManDays } from '@/lib/utils/allocation';
 import { getStatusColor } from '@/lib/utils/colors';
-import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
-import { getWeekLabel, isWithinRange } from '@/lib/utils/date-helpers';
 import { cn } from '@/lib/utils';
+import { AvailableStaffingConsultantCard } from '@/components/staffing/shared/staffing-consultant-picker';
 
 interface Props {
   scenario: Scenario;
@@ -50,25 +49,28 @@ export function ScenarioEditor({
   const updateTentativeAssignment = useOpportunityStore(
     (s) => s.updateTentativeAssignment
   );
+  const engagements = useEngagementStore((s) => s.engagements);
 
   const [addingMember, setAddingMember] = useState(false);
+  const [expandedConsultantId, setExpandedConsultantId] = useState<string | null>(null);
   const [newConsultantId, setNewConsultantId] = useState('');
   const [newRole, setNewRole] = useState<AssignmentRole>('consultant');
   const [newAllocation, setNewAllocation] = useState(100);
   const [practiceFilter, setPracticeFilter] = useState<PracticeArea | 'all'>('all');
 
-  const assignedIds = new Set(
-    scenario.tentative_assignments.map((ta) => ta.consultant_id)
-  );
-
   const availableConsultants = useMemo(
-    () =>
-      consultants.filter((c) => {
+    () => {
+      const assignedIds = new Set(
+        scenario.tentative_assignments.map((ta) => ta.consultant_id)
+      );
+
+      return consultants.filter((c) => {
         if (assignedIds.has(c.id)) return false;
         if (practiceFilter !== 'all' && c.practice_area !== practiceFilter) return false;
         return true;
-      }),
-    [consultants, assignedIds, practiceFilter]
+      });
+    },
+    [consultants, scenario.tentative_assignments, practiceFilter]
   );
 
   const totalAllocation = scenario.tentative_assignments.reduce(
@@ -76,9 +78,9 @@ export function ScenarioEditor({
     0
   );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newConsultantId) return;
-    addTentativeAssignment(scenario.id, {
+    await addTentativeAssignment(scenario.id, {
       consultant_id: newConsultantId,
       role: newRole,
       start_date: opportunity.start_date,
@@ -124,7 +126,12 @@ export function ScenarioEditor({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => setAddingMember(!addingMember)}
+          onClick={() => {
+            if (addingMember) {
+              setExpandedConsultantId(null);
+            }
+            setAddingMember(!addingMember);
+          }}
         >
           {addingMember ? 'Cancel' : '+ Add Consultant'}
         </Button>
@@ -182,73 +189,32 @@ export function ScenarioEditor({
                 No consultants available
               </p>
             ) : (
-              availableConsultants.map((consultant) => {
-                const currentUtil = getCurrentConsultantUtilization(
-                  consultant.id,
-                  assignments
-                );
-                const availability = Math.round(
-                  getAverageAvailability(
-                    consultant.id,
-                    assignments,
-                    parseISO(opportunity.start_date),
-                    parseISO(opportunity.end_date)
-                  )
-                );
-                const skillMatches = consultant.skills.filter((s) =>
-                  opportunity.required_skills.includes(s)
-                );
-
-                return (
-                  <button
-                    key={consultant.id}
-                    onClick={() =>
-                      setNewConsultantId((id) =>
-                        id === consultant.id ? '' : consultant.id
-                      )
-                    }
-                    className={cn(
-                      'w-full text-left px-3 py-2.5 border-b last:border-b-0 transition-colors',
-                      newConsultantId === consultant.id
-                        ? 'border-l-2 border-l-primary bg-primary/5'
-                        : 'hover:bg-slate-50'
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-sm font-medium truncate">
-                          {consultant.name}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {SENIORITY_LABELS[consultant.seniority_level as keyof typeof SENIORITY_LABELS]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {skillMatches.length > 0 && (
-                          <span className="text-[10px] text-emerald-600 font-medium">
-                            {skillMatches.length} skill match
-                          </span>
-                        )}
-                        <span
-                          className={cn(
-                            'text-[10px] font-medium',
-                            currentUtil > 100
-                              ? 'text-red-600'
-                              : currentUtil > 80
-                                ? 'text-amber-600'
-                                : 'text-green-600'
-                          )}
-                        >
-                          {currentUtil}% UR
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {availability}% avail
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+              availableConsultants.map((consultant) => (
+                <AvailableStaffingConsultantCard
+                  key={consultant.id}
+                  consultant={consultant}
+                  staffingWindow={{
+                    projectName: opportunity.project_name,
+                    startDate: opportunity.start_date,
+                    endDate: opportunity.end_date,
+                    requiredSkills: opportunity.required_skills,
+                  }}
+                  allAssignments={assignments}
+                  allEngagements={engagements}
+                  isSelected={newConsultantId === consultant.id}
+                  isExpanded={expandedConsultantId === consultant.id}
+                  onSelect={() => {
+                    setNewConsultantId((id) =>
+                      id === consultant.id ? '' : consultant.id
+                    );
+                  }}
+                  onToggleExpand={() => {
+                    setExpandedConsultantId((id) =>
+                      id === consultant.id ? null : consultant.id
+                    );
+                  }}
+                />
+              ))
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -361,9 +327,9 @@ export function ScenarioEditor({
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() =>
-                      removeTentativeAssignment(scenario.id, ta.id)
-                    }
+                    onClick={async () => {
+                      await removeTentativeAssignment(scenario.id, ta.id);
+                    }}
                   >
                     x
                   </Button>
@@ -376,8 +342,8 @@ export function ScenarioEditor({
                     </Label>
                     <Select
                       value={ta.role}
-                      onValueChange={(v) =>
-                        updateTentativeAssignment(scenario.id, ta.id, {
+                      onValueChange={async (v) =>
+                        await updateTentativeAssignment(scenario.id, ta.id, {
                           role: v as AssignmentRole,
                         })
                       }

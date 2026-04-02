@@ -1,3 +1,5 @@
+import type { AssignmentRole } from './assignment';
+
 export type PipelineStage =
   | 'identified'
   | 'qualifying'
@@ -74,6 +76,27 @@ export interface Opportunity {
   converted_engagement_id: string | null;
 }
 
+export interface TentativeAssignmentInput {
+  consultant_id: string;
+  role: AssignmentRole;
+  start_date: string;
+  end_date: string;
+  allocation_percentage: number;
+}
+
+export interface OpportunityDefaultScenarioInput {
+  name?: string | null;
+  tentative_assignments: TentativeAssignmentInput[];
+}
+
+export type OpportunityCreateInput = Omit<Opportunity, 'id'> & {
+  default_scenario?: OpportunityDefaultScenarioInput | null;
+};
+
+export type OpportunityUpdateInput = Partial<Omit<Opportunity, 'id'>> & {
+  default_scenario?: OpportunityDefaultScenarioInput | null;
+};
+
 export interface Scenario {
   id: string;
   opportunity_id: string;
@@ -88,7 +111,7 @@ export interface TentativeAssignment {
   id: string;
   scenario_id: string;
   consultant_id: string;
-  role: 'lead' | 'manager' | 'consultant' | 'analyst';
+  role: AssignmentRole;
   start_date: string;
   end_date: string;
   allocation_percentage: number;

@@ -7,7 +7,11 @@
  * Run: npx prisma db seed
  */
 
-import { PrismaClient } from '../src/generated/prisma/client';
+import {
+  PrismaClient,
+  type Consultant as PrismaConsultant,
+  type Engagement as PrismaEngagement,
+} from '../src/generated/prisma/client';
 import { faker } from '@faker-js/faker';
 import { addWeeks, format, startOfWeek } from 'date-fns';
 
@@ -64,6 +68,105 @@ const CLIENT_COLORS = [
   '#DC2626', '#7C3AED', '#DB2777', '#2563EB',
 ];
 
+const OPPORTUNITY_PIPELINE = [
+  {
+    clientName: 'Crestview Capital',
+    projectName: 'Due Diligence - Series B Target',
+    stage: 'verbal_commit' as const,
+    probability: 85,
+    estimatedValue: 420000,
+    color: '#7C3AED',
+    isBet: false,
+    skillNames: ['Due Diligence', 'Financial Modeling', 'Market Analysis'],
+    weekOffset: 2,
+    durationWeeks: 6,
+    primaryTeam: [
+      { consultantIndex: 0, role: 'lead' as const, allocation: 60 },
+      { consultantIndex: 5, role: 'manager' as const, allocation: 80 },
+      { consultantIndex: 12, role: 'consultant' as const, allocation: 100 },
+      { consultantIndex: 16, role: 'analyst' as const, allocation: 100 },
+    ],
+    leanTeam: [
+      { consultantIndex: 0, role: 'lead' as const, allocation: 40 },
+      { consultantIndex: 12, role: 'consultant' as const, allocation: 100 },
+      { consultantIndex: 16, role: 'analyst' as const, allocation: 80 },
+    ],
+  },
+  {
+    clientName: 'Orbit Logistics',
+    projectName: 'Supply Chain Digitization',
+    stage: 'proposal_sent' as const,
+    probability: 55,
+    estimatedValue: 680000,
+    color: '#0891B2',
+    isBet: true,
+    skillNames: ['Supply Chain', 'Digital Strategy', 'Process Optimization'],
+    weekOffset: 3,
+    durationWeeks: 10,
+    primaryTeam: [
+      { consultantIndex: 1, role: 'lead' as const, allocation: 40 },
+      { consultantIndex: 7, role: 'manager' as const, allocation: 80 },
+      { consultantIndex: 11, role: 'consultant' as const, allocation: 100 },
+      { consultantIndex: 15, role: 'analyst' as const, allocation: 80 },
+    ],
+    leanTeam: [
+      { consultantIndex: 1, role: 'lead' as const, allocation: 40 },
+      { consultantIndex: 11, role: 'consultant' as const, allocation: 100 },
+    ],
+  },
+  {
+    clientName: 'Beacon Health Systems',
+    projectName: 'Regulatory Readiness Program',
+    stage: 'qualifying' as const,
+    probability: 35,
+    estimatedValue: 350000,
+    color: '#059669',
+    isBet: false,
+    skillNames: ['Regulatory Compliance', 'Risk Assessment', 'Change Management'],
+    weekOffset: 4,
+    durationWeeks: 8,
+    primaryTeam: [
+      { consultantIndex: 4, role: 'lead' as const, allocation: 60 },
+      { consultantIndex: 9, role: 'consultant' as const, allocation: 100 },
+      { consultantIndex: 17, role: 'analyst' as const, allocation: 80 },
+    ],
+  },
+  {
+    clientName: 'Apex Consumer Group',
+    projectName: 'Customer Experience Redesign',
+    stage: 'identified' as const,
+    probability: 20,
+    estimatedValue: null,
+    color: '#D97706',
+    isBet: true,
+    skillNames: ['Customer Experience', 'Data Analytics', 'Digital Strategy'],
+    weekOffset: 6,
+    durationWeeks: 12,
+    primaryTeam: [
+      { consultantIndex: 2, role: 'lead' as const, allocation: 40 },
+      { consultantIndex: 13, role: 'consultant' as const, allocation: 80 },
+    ],
+  },
+  {
+    clientName: 'Titanium Manufacturing',
+    projectName: 'Cost Optimization Phase 2',
+    stage: 'proposal_sent' as const,
+    probability: 60,
+    estimatedValue: 520000,
+    color: '#DC2626',
+    isBet: false,
+    skillNames: ['Cost Reduction', 'Process Optimization', 'Financial Modeling'],
+    weekOffset: 1,
+    durationWeeks: 8,
+    primaryTeam: [
+      { consultantIndex: 3, role: 'lead' as const, allocation: 60 },
+      { consultantIndex: 6, role: 'manager' as const, allocation: 80 },
+      { consultantIndex: 14, role: 'consultant' as const, allocation: 100 },
+      { consultantIndex: 18, role: 'analyst' as const, allocation: 80 },
+    ],
+  },
+];
+
 function seniorityToRole(seniority: string): string {
   switch (seniority) {
     case 'partner': return 'Partner';
@@ -80,6 +183,10 @@ async function main() {
   await prisma.$transaction([
     prisma.proposalSlot.deleteMany(),
     prisma.proposal.deleteMany(),
+    prisma.tentativeAssignment.deleteMany(),
+    prisma.scenario.deleteMany(),
+    prisma.opportunitySkill.deleteMany(),
+    prisma.opportunity.deleteMany(),
     prisma.wellbeingSignal.deleteMany(),
     prisma.assignment.deleteMany(),
     prisma.consultantSkill.deleteMany(),
@@ -101,7 +208,7 @@ async function main() {
 
   // ── 2. Create consultants ─────────────────────────────
   console.log('Creating consultants...');
-  const consultants = [];
+  const consultants: PrismaConsultant[] = [];
   for (let i = 0; i < 20; i++) {
     const practiceArea = PRACTICE_AREAS[i % 5];
     const seniority = SENIORITY_DISTRIBUTION[i];
@@ -141,7 +248,7 @@ async function main() {
   const now = startOfWeek(new Date(), { weekStartsOn: 1 });
   const durations = [3, 4, 6, 8, 5, 10, 7, 12];
   const offsets = [-2, -1, 0, 1, -3, 2, -1, 3];
-  const engagements = [];
+  const engagements: PrismaEngagement[] = [];
 
   for (let i = 0; i < 8; i++) {
     const start = addWeeks(now, offsets[i]);
@@ -242,12 +349,84 @@ async function main() {
     });
   }
 
+  // ── 6. Create opportunities + tentative staffing ─────────
+  console.log('Creating opportunities...');
+  let scenarioCount = 0;
+  let tentativeAssignmentCount = 0;
+
+  for (const definition of OPPORTUNITY_PIPELINE) {
+    const start = addWeeks(now, definition.weekOffset);
+    const end = addWeeks(start, definition.durationWeeks);
+
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        clientName: definition.clientName,
+        projectName: definition.projectName,
+        startDate: new Date(format(start, 'yyyy-MM-dd')),
+        endDate: new Date(format(end, 'yyyy-MM-dd')),
+        stage: definition.stage,
+        probability: definition.probability,
+        estimatedValue: definition.estimatedValue,
+        color: definition.color,
+        isBet: definition.isBet,
+        requiredSkills: {
+          create: definition.skillNames.map((skillName) => ({
+            skillId: skillByName.get(skillName)!.id,
+          })),
+        },
+      },
+    });
+
+    await prisma.scenario.create({
+      data: {
+        opportunityId: opportunity.id,
+        name: 'Primary Team',
+        isDefault: true,
+        tentativeAssignments: {
+          create: definition.primaryTeam.map((member) => ({
+            consultantId: consultants[member.consultantIndex].id,
+            role: member.role,
+            startDate: new Date(format(start, 'yyyy-MM-dd')),
+            endDate: new Date(format(end, 'yyyy-MM-dd')),
+            allocationPercentage: member.allocation,
+          })),
+        },
+      },
+    });
+    scenarioCount += 1;
+    tentativeAssignmentCount += definition.primaryTeam.length;
+
+    if (definition.leanTeam) {
+      await prisma.scenario.create({
+        data: {
+          opportunityId: opportunity.id,
+          name: 'Lean Team',
+          isDefault: false,
+          tentativeAssignments: {
+            create: definition.leanTeam.map((member) => ({
+              consultantId: consultants[member.consultantIndex].id,
+              role: member.role,
+              startDate: new Date(format(start, 'yyyy-MM-dd')),
+              endDate: new Date(format(end, 'yyyy-MM-dd')),
+              allocationPercentage: member.allocation,
+            })),
+          },
+        },
+      });
+      scenarioCount += 1;
+      tentativeAssignmentCount += definition.leanTeam.length;
+    }
+  }
+
   console.log('Seed complete!');
   console.log(`  ${skills.length} skills`);
   console.log(`  ${consultants.length} consultants`);
   console.log(`  ${engagements.length} engagements`);
   console.log(`  ${assignmentDefs.reduce((sum, d) => sum + d.team.length, 0)} assignments`);
   console.log(`  ${signals.length} wellbeing signals`);
+  console.log(`  ${OPPORTUNITY_PIPELINE.length} opportunities`);
+  console.log(`  ${scenarioCount} scenarios`);
+  console.log(`  ${tentativeAssignmentCount} tentative assignments`);
 }
 
 main()
