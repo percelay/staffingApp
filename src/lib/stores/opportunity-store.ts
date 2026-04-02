@@ -111,10 +111,17 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
       opportunities: opportunities.map((opportunity) => ({
         ...opportunity,
         stage: normalizePipelineStage(opportunity.stage),
+        required_skills: opportunity.required_skills ?? [],
       })),
     }),
 
-  setScenarios: (scenarios) => set({ scenarios }),
+  setScenarios: (scenarios) =>
+    set({
+      scenarios: scenarios.map((scenario) => ({
+        ...scenario,
+        tentative_assignments: scenario.tentative_assignments ?? [],
+      })),
+    }),
 
   fetchOpportunities: async () => {
     set({ loading: true });

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { toOpportunityDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
 import { normalizePipelineStage } from '@/lib/types/opportunity';
+import { normalizeIsoDateRange } from '@/lib/utils/date-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,24 @@ export const PATCH = withAuth(
       return Response.json({ error: 'Opportunity not found' }, { status: 404 });
     }
 
+    const normalizedOpportunityDates =
+      body.start_date !== undefined || body.end_date !== undefined
+        ? normalizeIsoDateRange(
+            body.start_date ?? existing.startDate.toISOString().split('T')[0],
+            body.end_date ?? existing.endDate.toISOString().split('T')[0]
+          )
+        : null;
+
+    if (
+      (body.start_date !== undefined || body.end_date !== undefined) &&
+      !normalizedOpportunityDates
+    ) {
+      return Response.json(
+        { error: 'Invalid opportunity date range' },
+        { status: 400 }
+      );
+    }
+
     await prisma.$transaction(async (tx) => {
       if (required_skills !== undefined) {
         await tx.opportunitySkill.deleteMany({ where: { opportunityId: id } });
@@ -76,8 +95,12 @@ export const PATCH = withAuth(
       const data: any = {};
       if (body.client_name !== undefined) data.clientName = body.client_name;
       if (body.project_name !== undefined) data.projectName = body.project_name;
-      if (body.start_date !== undefined) data.startDate = new Date(body.start_date);
-      if (body.end_date !== undefined) data.endDate = new Date(body.end_date);
+      if (body.start_date !== undefined && normalizedOpportunityDates) {
+        data.startDate = new Date(normalizedOpportunityDates.startDate);
+      }
+      if (body.end_date !== undefined && normalizedOpportunityDates) {
+        data.endDate = new Date(normalizedOpportunityDates.endDate);
+      }
       if (body.stage !== undefined) data.stage = normalizePipelineStage(body.stage);
       if (body.probability !== undefined) data.probability = body.probability;
       if (body.estimated_value !== undefined) data.estimatedValue = body.estimated_value;
@@ -90,12 +113,12 @@ export const PATCH = withAuth(
       }
 
       if (default_scenario !== undefined) {
-        const scenarioStartDate = body.start_date
-          ? new Date(body.start_date)
-          : existing.startDate;
-        const scenarioEndDate = body.end_date
-          ? new Date(body.end_date)
-          : existing.endDate;
+        const scenarioStartDate =
+          normalizedOpportunityDates?.startDate ??
+          existing.startDate.toISOString().split('T')[0];
+        const scenarioEndDate =
+          normalizedOpportunityDates?.endDate ??
+          existing.endDate.toISOString().split('T')[0];
         const currentDefaultScenario = await tx.scenario.findFirst({
           where: { opportunityId: id, isDefault: true },
         });
@@ -110,18 +133,28 @@ export const PATCH = withAuth(
               name:
                 default_scenario?.name?.trim() || currentDefaultScenario.name,
               tentativeAssignments: {
-                create: (default_scenario?.tentative_assignments ?? []).map(
+                create: (default_scenario?.tentative_assignments ?? []).flatMap(
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (assignment: any) => ({
-                    consultantId: assignment.consultant_id,
-                    role: assignment.role,
-                    startDate: new Date(
-                      assignment.start_date || scenarioStartDate
-                    ),
-                    endDate: new Date(assignment.end_date || scenarioEndDate),
-                    allocationPercentage:
-                      assignment.allocation_percentage ?? 100,
-                  })
+                  (assignment: any) => {
+                    const normalizedAssignmentDates = normalizeIsoDateRange(
+                      assignment.start_date || scenarioStartDate,
+                      assignment.end_date || scenarioEndDate
+                    );
+                    if (!normalizedAssignmentDates) {
+                      return [];
+                    }
+
+                    return [
+                      {
+                        consultantId: assignment.consultant_id,
+                        role: assignment.role,
+                        startDate: new Date(normalizedAssignmentDates.startDate),
+                        endDate: new Date(normalizedAssignmentDates.endDate),
+                        allocationPercentage:
+                          assignment.allocation_percentage ?? 100,
+                      },
+                    ];
+                  }
                 ),
               },
             },
@@ -133,18 +166,28 @@ export const PATCH = withAuth(
               name: default_scenario?.name?.trim() || 'Primary Team',
               isDefault: true,
               tentativeAssignments: {
-                create: (default_scenario?.tentative_assignments ?? []).map(
+                create: (default_scenario?.tentative_assignments ?? []).flatMap(
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (assignment: any) => ({
-                    consultantId: assignment.consultant_id,
-                    role: assignment.role,
-                    startDate: new Date(
-                      assignment.start_date || scenarioStartDate
-                    ),
-                    endDate: new Date(assignment.end_date || scenarioEndDate),
-                    allocationPercentage:
-                      assignment.allocation_percentage ?? 100,
-                  })
+                  (assignment: any) => {
+                    const normalizedAssignmentDates = normalizeIsoDateRange(
+                      assignment.start_date || scenarioStartDate,
+                      assignment.end_date || scenarioEndDate
+                    );
+                    if (!normalizedAssignmentDates) {
+                      return [];
+                    }
+
+                    return [
+                      {
+                        consultantId: assignment.consultant_id,
+                        role: assignment.role,
+                        startDate: new Date(normalizedAssignmentDates.startDate),
+                        endDate: new Date(normalizedAssignmentDates.endDate),
+                        allocationPercentage:
+                          assignment.allocation_percentage ?? 100,
+                      },
+                    ];
+                  }
                 ),
               },
             },

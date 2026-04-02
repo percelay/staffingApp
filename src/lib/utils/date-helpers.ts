@@ -8,10 +8,46 @@ import {
   parseISO,
   isBefore,
   isAfter,
+  isValid,
 } from 'date-fns';
 
+export function normalizeDateInterval(
+  start: Date,
+  end: Date
+): { start: Date; end: Date } | null {
+  if (!isValid(start) || !isValid(end)) {
+    return null;
+  }
+
+  return start <= end ? { start, end } : { start: end, end: start };
+}
+
+export function normalizeIsoDateRange(
+  startDate: string,
+  endDate: string
+): { startDate: string; endDate: string } | null {
+  const normalized = normalizeDateInterval(
+    parseISO(startDate),
+    parseISO(endDate)
+  );
+
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    startDate: format(normalized.start, 'yyyy-MM-dd'),
+    endDate: format(normalized.end, 'yyyy-MM-dd'),
+  };
+}
+
 export function getWeeksBetween(start: Date, end: Date): Date[] {
-  return eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
+  const normalized = normalizeDateInterval(start, end);
+  if (!normalized) {
+    return [];
+  }
+
+  return eachWeekOfInterval(normalized, { weekStartsOn: 1 });
 }
 
 export function getWeekLabel(date: Date): string {
@@ -19,7 +55,12 @@ export function getWeekLabel(date: Date): string {
 }
 
 export function isWithinRange(date: Date, start: Date, end: Date): boolean {
-  return isWithinInterval(date, { start, end });
+  const normalized = normalizeDateInterval(start, end);
+  if (!normalized || !isValid(date)) {
+    return false;
+  }
+
+  return isWithinInterval(date, normalized);
 }
 
 export function get12WeekWindow(offset: number = 0): { start: Date; end: Date } {
@@ -30,7 +71,15 @@ export function get12WeekWindow(offset: number = 0): { start: Date; end: Date } 
 }
 
 export function getWeekCount(startDate: string, endDate: string): number {
-  return differenceInWeeks(parseISO(endDate), parseISO(startDate));
+  const normalized = normalizeDateInterval(
+    parseISO(startDate),
+    parseISO(endDate)
+  );
+  if (!normalized) {
+    return 0;
+  }
+
+  return differenceInWeeks(normalized.end, normalized.start);
 }
 
 export function dateToISO(date: Date): string {
@@ -43,9 +92,12 @@ export function datesOverlap(
   bStart: string,
   bEnd: string
 ): boolean {
-  const a1 = parseISO(aStart);
-  const a2 = parseISO(aEnd);
-  const b1 = parseISO(bStart);
-  const b2 = parseISO(bEnd);
-  return isBefore(a1, b2) && isAfter(a2, b1);
+  const left = normalizeDateInterval(parseISO(aStart), parseISO(aEnd));
+  const right = normalizeDateInterval(parseISO(bStart), parseISO(bEnd));
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return isBefore(left.start, right.end) && isAfter(left.end, right.start);
 }

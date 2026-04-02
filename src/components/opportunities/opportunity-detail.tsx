@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, differenceInWeeks } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import {
   PIPELINE_STAGE_BADGE_CLASSES,
 } from '@/lib/types/opportunity';
 import { getCapacityConflicts } from '@/lib/utils/impact';
+import { getWeekCount } from '@/lib/utils/date-helpers';
 import { ScenarioEditor } from './scenario-editor';
 import { ScenarioComparison } from './scenario-comparison';
 import { CreateOpportunityDialog } from './create-opportunity-dialog';
@@ -86,10 +87,7 @@ export function OpportunityDetail({
     );
   }
 
-  const weeks = differenceInWeeks(
-    parseISO(opportunity.end_date),
-    parseISO(opportunity.start_date)
-  );
+  const weeks = getWeekCount(opportunity.start_date, opportunity.end_date);
 
   const handleAddScenario = async () => {
     if (!newScenarioName.trim()) return;

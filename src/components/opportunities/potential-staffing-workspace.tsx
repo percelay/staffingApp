@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { differenceInWeeks, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,7 @@ import {
   PIPELINE_STAGE_LABELS,
   type PipelineStage,
 } from '@/lib/types/opportunity';
+import { getWeekCount } from '@/lib/utils/date-helpers';
 import { CreateOpportunityDialog } from './create-opportunity-dialog';
 import { OpportunityDetail } from './opportunity-detail';
 
@@ -151,11 +151,11 @@ export function PotentialStaffingWorkspace({
                   (scenario) => scenario.opportunity_id === opportunity.id
                 );
               const teamCount =
-                defaultScenario?.tentative_assignments.length ?? 0;
+                defaultScenario?.tentative_assignments?.length ?? 0;
               const isSelected = selectedId === opportunity.id;
-              const weeks = differenceInWeeks(
-                parseISO(opportunity.end_date),
-                parseISO(opportunity.start_date)
+              const weeks = getWeekCount(
+                opportunity.start_date,
+                opportunity.end_date
               );
 
               return (

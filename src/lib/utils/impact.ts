@@ -9,7 +9,11 @@
 import { parseISO } from 'date-fns';
 import type { Assignment } from '../types/assignment';
 import type { Opportunity, Scenario, TentativeAssignment } from '../types/opportunity';
-import { getWeeksBetween, isWithinRange } from './date-helpers';
+import {
+  getWeeksBetween,
+  isWithinRange,
+  normalizeDateInterval,
+} from './date-helpers';
 
 /**
  * Projected utilization = actual allocation + tentative allocation on a given date.
@@ -25,16 +29,24 @@ export function getProjectedUtilization(
 
   for (const a of realAssignments) {
     if (a.consultant_id !== consultantId) continue;
-    const start = parseISO(a.start_date);
-    const end = parseISO(a.end_date);
-    if (start <= date && end >= date) total += a.allocation_percentage;
+    const interval = normalizeDateInterval(
+      parseISO(a.start_date),
+      parseISO(a.end_date)
+    );
+    if (interval && interval.start <= date && interval.end >= date) {
+      total += a.allocation_percentage;
+    }
   }
 
   for (const ta of tentativeAssignments) {
     if (ta.consultant_id !== consultantId) continue;
-    const start = parseISO(ta.start_date);
-    const end = parseISO(ta.end_date);
-    if (start <= date && end >= date) total += ta.allocation_percentage;
+    const interval = normalizeDateInterval(
+      parseISO(ta.start_date),
+      parseISO(ta.end_date)
+    );
+    if (interval && interval.start <= date && interval.end >= date) {
+      total += ta.allocation_percentage;
+    }
   }
 
   return total;
@@ -54,10 +66,13 @@ export function getCapacityConflicts(
   let minDate: Date | null = null;
   let maxDate: Date | null = null;
   for (const ta of scenario.tentative_assignments) {
-    const s = parseISO(ta.start_date);
-    const e = parseISO(ta.end_date);
-    if (!minDate || s < minDate) minDate = s;
-    if (!maxDate || e > maxDate) maxDate = e;
+    const interval = normalizeDateInterval(
+      parseISO(ta.start_date),
+      parseISO(ta.end_date)
+    );
+    if (!interval) continue;
+    if (!minDate || interval.start < minDate) minDate = interval.start;
+    if (!maxDate || interval.end > maxDate) maxDate = interval.end;
   }
   if (!minDate || !maxDate) return conflicts;
 
@@ -112,9 +127,11 @@ export function getWeightedPipelineUtilization(
 
     for (const ta of defaultScenario.tentative_assignments) {
       if (ta.consultant_id !== consultantId) continue;
-      const start = parseISO(ta.start_date);
-      const end = parseISO(ta.end_date);
-      if (start <= date && end >= date) {
+      const interval = normalizeDateInterval(
+        parseISO(ta.start_date),
+        parseISO(ta.end_date)
+      );
+      if (interval && interval.start <= date && interval.end >= date) {
         weighted += ta.allocation_percentage * (opp.probability / 100);
       }
     }

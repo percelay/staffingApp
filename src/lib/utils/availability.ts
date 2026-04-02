@@ -1,6 +1,10 @@
 import { parseISO } from 'date-fns';
 import type { Assignment } from '../types';
-import { getWeeksBetween, isWithinRange } from './date-helpers';
+import {
+  getWeeksBetween,
+  isWithinRange,
+  normalizeDateInterval,
+} from './date-helpers';
 
 export interface AvailabilityGap {
   weekStart: Date;
@@ -13,7 +17,12 @@ export function getWeeklyAllocations(
   start: Date,
   end: Date
 ): AvailabilityGap[] {
-  const weeks = getWeeksBetween(start, end);
+  const normalizedWindow = normalizeDateInterval(start, end);
+  if (!normalizedWindow) {
+    return [];
+  }
+
+  const weeks = getWeeksBetween(normalizedWindow.start, normalizedWindow.end);
   const consultantAssignments = assignments.filter(
     (a) => a.consultant_id === consultantId
   );

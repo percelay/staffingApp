@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { toOpportunityDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
 import { normalizePipelineStage } from '@/lib/types/opportunity';
+import { normalizeIsoDateRange } from '@/lib/utils/date-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,14 +39,25 @@ export const GET = withAuth('opportunities', async (request) => {
 export const POST = withAuth('opportunities', async (request) => {
   const body = await request.json();
   const { required_skills = [], default_scenario, ...rest } = body;
+  const normalizedOpportunityDates = normalizeIsoDateRange(
+    rest.start_date,
+    rest.end_date
+  );
+
+  if (!normalizedOpportunityDates) {
+    return Response.json(
+      { error: 'Invalid opportunity date range' },
+      { status: 400 }
+    );
+  }
 
   const opportunity = await prisma.$transaction(async (tx) => {
     const created = await tx.opportunity.create({
       data: {
         clientName: rest.client_name,
         projectName: rest.project_name,
-        startDate: new Date(rest.start_date),
-        endDate: new Date(rest.end_date),
+        startDate: new Date(normalizedOpportunityDates.startDate),
+        endDate: new Date(normalizedOpportunityDates.endDate),
         stage: rest.stage ? normalizePipelineStage(rest.stage) : 'identified',
         probability: rest.probability ?? 25,
         estimatedValue: rest.estimated_value ?? null,
@@ -74,15 +86,27 @@ export const POST = withAuth('opportunities', async (request) => {
         name: default_scenario?.name?.trim() || 'Primary Team',
         isDefault: true,
         tentativeAssignments: {
-          create: (default_scenario?.tentative_assignments ?? []).map(
+          create: (default_scenario?.tentative_assignments ?? []).flatMap(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (assignment: any) => ({
-              consultantId: assignment.consultant_id,
-              role: assignment.role,
-              startDate: new Date(assignment.start_date || rest.start_date),
-              endDate: new Date(assignment.end_date || rest.end_date),
-              allocationPercentage: assignment.allocation_percentage ?? 100,
-            })
+            (assignment: any) => {
+              const normalizedAssignmentDates = normalizeIsoDateRange(
+                assignment.start_date || normalizedOpportunityDates.startDate,
+                assignment.end_date || normalizedOpportunityDates.endDate
+              );
+              if (!normalizedAssignmentDates) {
+                return [];
+              }
+
+              return [
+                {
+                  consultantId: assignment.consultant_id,
+                  role: assignment.role,
+                  startDate: new Date(normalizedAssignmentDates.startDate),
+                  endDate: new Date(normalizedAssignmentDates.endDate),
+                  allocationPercentage: assignment.allocation_percentage ?? 100,
+                },
+              ];
+            }
           ),
         },
       },
