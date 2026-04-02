@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { differenceInWeeks, parseISO } from 'date-fns';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,9 +31,14 @@ const PIPELINE_STAGE_ORDER: Record<PipelineStage, number> = {
   lost: 5,
 };
 
-export function PotentialStaffingWorkspace() {
+interface PotentialStaffingWorkspaceProps {
+  initialOpportunityId?: string | null;
+}
+
+export function PotentialStaffingWorkspace({
+  initialOpportunityId = null,
+}: PotentialStaffingWorkspaceProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const opportunities = useOpportunityStore((state) => state.opportunities);
   const scenarios = useOpportunityStore((state) => state.scenarios);
 
@@ -70,7 +75,7 @@ export function PotentialStaffingWorkspace() {
   }, [opportunities, searchQuery, stageFilter]);
 
   const selectedId = useMemo(() => {
-    const opportunityId = searchParams.get('opportunityId');
+    const opportunityId = initialOpportunityId;
     if (
       opportunityId &&
       opportunities.some((opportunity) => opportunity.id === opportunityId)
@@ -79,7 +84,7 @@ export function PotentialStaffingWorkspace() {
     }
 
     return filteredOpportunities[0]?.id ?? opportunities[0]?.id ?? null;
-  }, [filteredOpportunities, opportunities, searchParams]);
+  }, [filteredOpportunities, initialOpportunityId, opportunities]);
 
   const handleDeleted = () => {
     const remaining = filteredOpportunities.filter(
