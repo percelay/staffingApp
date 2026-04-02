@@ -302,21 +302,21 @@ export function CreateOpportunityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="h-[min(94vh,980px)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:w-[min(96vw,1320px)] sm:max-w-[1320px]">
+        <DialogHeader className="border-b px-6 py-5 pr-14 sm:px-8 sm:py-6">
           <DialogTitle>
             {isEditing ? 'Edit Opportunity' : 'New Opportunity'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="max-w-2xl">
             Capture opportunity details and build the default staffing plan in one
             place.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-2 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.95fr)]">
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="text-xs">Client Name</Label>
                   <Input
@@ -335,7 +335,7 @@ export function CreateOpportunityDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="text-xs">Expected Start</Label>
                   <Input
@@ -354,7 +354,7 @@ export function CreateOpportunityDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 <div className="space-y-2">
                   <Label className="text-xs">Pipeline Stage</Label>
                   <Select
@@ -400,38 +400,40 @@ export function CreateOpportunityDialog({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Color</Label>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {COLOR_PALETTE.map((paletteColor) => (
-                    <button
-                      key={paletteColor}
-                      type="button"
-                      className={`h-6 w-6 rounded-md border-2 transition-all ${
-                        color === paletteColor
-                          ? 'scale-110 border-foreground'
-                          : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: paletteColor }}
-                      onClick={() => setColor(paletteColor)}
-                    />
-                  ))}
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="space-y-2">
+                  <Label className="text-xs">Color</Label>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {COLOR_PALETTE.map((paletteColor) => (
+                      <button
+                        key={paletteColor}
+                        type="button"
+                        className={`h-7 w-7 rounded-md border-2 transition-all ${
+                          color === paletteColor
+                            ? 'scale-110 border-foreground'
+                            : 'border-transparent'
+                        }`}
+                        style={{ backgroundColor: paletteColor }}
+                        onClick={() => setColor(paletteColor)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <Label className="text-xs">Bet</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Mark this opportunity as a strategic bet
-                  </p>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs">Bet</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Mark this opportunity as a strategic bet
+                    </p>
+                  </div>
+                  <Switch checked={isBet} onCheckedChange={setIsBet} />
                 </div>
-                <Switch checked={isBet} onCheckedChange={setIsBet} />
               </div>
 
               <div className="space-y-2">
                 <Label className="text-xs">Required Skills</Label>
-                <div className="max-h-28 overflow-y-auto rounded-md border p-3">
+                <div className="max-h-40 overflow-y-auto rounded-md border p-4">
                   <div className="flex flex-wrap gap-1.5">
                     {ALL_SKILLS.map((skill) => (
                       <Badge
@@ -461,13 +463,13 @@ export function CreateOpportunityDialog({
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Context, partners, constraints, or client notes..."
-                  className="min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="min-h-32 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
               </div>
             </div>
 
-            <div className="space-y-4 rounded-xl border bg-slate-50/40 p-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-5 rounded-2xl border bg-slate-50/40 p-5 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Default Staffing ({defaultTeam.length})
@@ -491,8 +493,8 @@ export function CreateOpportunityDialog({
               </div>
 
               {addingMember && (
-                <div className="space-y-3 rounded-lg border bg-white p-4">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-4 rounded-xl border bg-white p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <Label className="text-sm font-medium">Add Team Member</Label>
                     <Select
                       value={practiceFilter}
@@ -500,7 +502,7 @@ export function CreateOpportunityDialog({
                         setPracticeFilter(value as PracticeArea | 'all')
                       }
                     >
-                      <SelectTrigger className="h-7 w-[140px] text-[11px]">
+                      <SelectTrigger className="h-9 w-full text-xs sm:w-[180px]">
                         <SelectValue placeholder="Filter..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -514,7 +516,7 @@ export function CreateOpportunityDialog({
                     </Select>
                   </div>
 
-                  <div className="max-h-[320px] overflow-y-auto rounded-md border">
+                  <div className="max-h-[420px] overflow-y-auto rounded-lg border">
                     {availableConsultants.length === 0 ? (
                       <p className="py-4 text-center text-xs text-muted-foreground">
                         No consultants available
@@ -549,7 +551,7 @@ export function CreateOpportunityDialog({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
                     <div className="space-y-1">
                       <Label className="text-xs">Role</Label>
                       <Select
@@ -558,7 +560,7 @@ export function CreateOpportunityDialog({
                           setNewRole(value as AssignmentRole)
                         }
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-9 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -591,10 +593,9 @@ export function CreateOpportunityDialog({
                   </div>
 
                   <Button
-                    size="sm"
                     onClick={handleAddTeamMember}
                     disabled={!newConsultantId}
-                    className="w-full"
+                    className="w-full sm:w-auto"
                   >
                     Add to Default Team
                   </Button>
@@ -612,7 +613,7 @@ export function CreateOpportunityDialog({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {defaultTeam.map((assignment) => {
                     const consultant = consultants.find(
                       (candidate) => candidate.id === assignment.consultant_id
@@ -637,9 +638,9 @@ export function CreateOpportunityDialog({
                     return (
                       <div
                         key={assignment.id}
-                        className="space-y-3 rounded-lg border border-dashed border-slate-300 bg-white p-4"
+                        className="space-y-4 rounded-xl border border-dashed border-slate-300 bg-white p-4"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-start gap-3">
                           <div className="relative">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -661,23 +662,25 @@ export function CreateOpportunityDialog({
                               {PRACTICE_AREA_LABELS[consultant.practice_area]}
                             </p>
                           </div>
-                          <Badge
-                            variant="outline"
-                            className="border-dashed text-[10px]"
-                          >
-                            Tentative
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemoveTeamMember(assignment.id)}
-                          >
-                            x
-                          </Button>
+                          <div className="ml-auto flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="border-dashed text-[10px]"
+                            >
+                              Tentative
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveTeamMember(assignment.id)}
+                            >
+                              x
+                            </Button>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                           <div className="space-y-1">
                             <Label className="text-[10px] text-muted-foreground">
                               Role
@@ -690,7 +693,7 @@ export function CreateOpportunityDialog({
                                 })
                               }
                             >
-                              <SelectTrigger className="h-7 text-xs">
+                              <SelectTrigger className="h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -709,7 +712,7 @@ export function CreateOpportunityDialog({
                               Allocation
                             </Label>
                             <div className="space-y-1">
-                              <div className="flex h-7 items-center justify-center rounded-md border text-xs font-medium">
+                              <div className="flex h-8 items-center justify-center rounded-md border text-xs font-medium">
                                 {assignment.allocation_percentage}%{' '}
                                 <span className="ml-1 text-muted-foreground">
                                   (
@@ -744,7 +747,7 @@ export function CreateOpportunityDialog({
                             </Label>
                             <div
                               className={cn(
-                                'flex h-7 items-center justify-center rounded-md border text-xs font-bold',
+                                'flex h-8 items-center justify-center rounded-md border text-xs font-bold',
                                 currentUtilization > 100
                                   ? 'border-red-200 bg-red-50 text-red-700'
                                   : currentUtilization > 80
@@ -762,7 +765,7 @@ export function CreateOpportunityDialog({
                             </Label>
                             <div
                               className={cn(
-                                'flex h-7 items-center justify-center rounded-md border border-dashed text-xs font-bold',
+                                'flex h-8 items-center justify-center rounded-md border border-dashed text-xs font-bold',
                                 projectedUtilization > 100
                                   ? 'border-red-300 bg-red-50 text-red-700'
                                   : projectedUtilization > 80
@@ -781,19 +784,19 @@ export function CreateOpportunityDialog({
               )}
             </div>
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button onClick={handleSubmit} disabled={saving} className="flex-1">
-              {saving
-                ? 'Saving...'
-                : isEditing
-                  ? 'Save Changes'
-                  : 'Create Opportunity'}
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-          </div>
+        <div className="flex flex-col-reverse gap-3 border-t bg-background px-6 py-4 sm:flex-row sm:justify-end sm:px-8">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={saving} className="sm:min-w-44">
+            {saving
+              ? 'Saving...'
+              : isEditing
+                ? 'Save Changes'
+                : 'Create Opportunity'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
