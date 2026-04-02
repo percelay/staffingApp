@@ -33,12 +33,6 @@ const ACTUAL_ITEMS: NavItem[] = [
   { label: 'People', icon: '◎', view: 'actual-people', href: '/manage' },
 ];
 
-const POTENTIAL_ITEMS: NavItem[] = [
-  { label: 'Timeline', icon: '▦', view: 'potential-timeline', href: '/timeline' },
-  { label: 'Staffing', icon: '⊞', view: 'potential-staffing', href: '/opportunities' },
-  { label: 'People', icon: '◎', view: 'potential-people', href: '/manage' },
-];
-
 const TOP_ITEMS = [
   { label: 'Executive', href: '/executive', icon: '◈' },
 ];
@@ -51,7 +45,6 @@ export function AppSidebar() {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [actualOpen, setActualOpen] = useState(true);
-  const [potentialOpen, setPotentialOpen] = useState(true);
 
   const handleLogout = () => {
     logout();
@@ -110,6 +103,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Opportunities */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeView === 'opportunities'}
+                  onClick={() => { setActiveView('opportunities'); router.push('/opportunities'); }}
+                  className="gap-3"
+                >
+                  <span className="text-base">◇</span>
+                  <span>Opportunities</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {/* Actual group */}
         <SidebarGroup>
           <SidebarGroupLabel
@@ -139,34 +150,6 @@ export function AppSidebar() {
           )}
         </SidebarGroup>
 
-        {/* Potential group */}
-        <SidebarGroup>
-          <SidebarGroupLabel
-            className="cursor-pointer select-none"
-            onClick={() => setPotentialOpen(!potentialOpen)}
-          >
-            <span className="text-[10px] mr-1.5 text-muted-foreground">{potentialOpen ? '▾' : '▸'}</span>
-            Potential
-          </SidebarGroupLabel>
-          {potentialOpen && (
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {POTENTIAL_ITEMS.map((item) => (
-                  <SidebarMenuItem key={item.view}>
-                    <SidebarMenuButton
-                      isActive={activeView === item.view}
-                      onClick={() => handleNav(item)}
-                      className="gap-3"
-                    >
-                      <span className="text-base">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          )}
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-4">

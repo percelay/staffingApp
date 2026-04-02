@@ -20,6 +20,7 @@ export async function createOpportunityAndRedirect(
       probability: input.probability ?? 25,
       estimatedValue: input.estimated_value ?? null,
       color: input.color || '#6366F1',
+      isBet: input.is_bet ?? false,
       notes: input.notes ?? null,
       convertedEngagementId: input.converted_engagement_id ?? null,
       requiredSkills: {

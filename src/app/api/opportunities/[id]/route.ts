@@ -56,6 +56,7 @@ export const PATCH = withAuth('opportunities', async (request) => {
   if (body.probability !== undefined) data.probability = body.probability;
   if (body.estimated_value !== undefined) data.estimatedValue = body.estimated_value;
   if (body.color !== undefined) data.color = body.color;
+  if (body.is_bet !== undefined) data.isBet = body.is_bet;
   if (body.notes !== undefined) data.notes = body.notes;
 
   if (Object.keys(data).length > 0) {

@@ -49,6 +49,7 @@ export const POST = withAuth('opportunities', async (request) => {
       probability: rest.probability ?? 25,
       estimatedValue: rest.estimated_value ?? null,
       color: rest.color || '#6366F1',
+      isBet: rest.is_bet ?? false,
       notes: rest.notes ?? null,
       requiredSkills: {
         create: (required_skills || []).map((skillName: string) => ({

@@ -122,6 +122,7 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
       ...data,
       id: crypto.randomUUID(),
       stage: normalizePipelineStage(data.stage),
+      is_bet: data.is_bet ?? false,
     };
     set((s) => ({ opportunities: [...s.opportunities, local] }));
     return local;

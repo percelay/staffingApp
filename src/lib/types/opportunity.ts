@@ -69,6 +69,7 @@ export interface Opportunity {
   estimated_value: number | null;
   required_skills: string[];
   color: string;
+  is_bet: boolean;
   notes: string | null;
   converted_engagement_id: string | null;
 }

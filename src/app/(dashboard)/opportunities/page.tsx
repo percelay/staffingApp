@@ -1,7 +1,7 @@
 'use client';
 
-import { OpportunityPipeline } from '@/components/opportunities/opportunity-pipeline';
+import { OpportunityBoard } from '@/components/opportunities/opportunity-board';
 
 export default function OpportunitiesPage() {
-  return <OpportunityPipeline />;
+  return <OpportunityBoard />;
 }

@@ -100,6 +100,7 @@ export function generateOpportunitySeedData(): {
       estimated_value: client.value,
       required_skills: client.skills,
       color: client.color,
+      is_bet: false,
       notes: null,
       converted_engagement_id: null,
     });

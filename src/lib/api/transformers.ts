@@ -136,6 +136,7 @@ type PrismaOpportunityWithSkills = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   estimatedValue: any; // Prisma Decimal
   color: string;
+  isBet: boolean;
   notes: string | null;
   convertedEngagementId: string | null;
   requiredSkills: Array<{
@@ -175,6 +176,7 @@ export function toOpportunityDTO(p: PrismaOpportunityWithSkills): Opportunity {
     estimated_value: p.estimatedValue ? Number(p.estimatedValue) : null,
     required_skills: p.requiredSkills.map((os) => os.skill.name),
     color: p.color,
+    is_bet: p.isBet,
     notes: p.notes,
     converted_engagement_id: p.convertedEngagementId,
   };

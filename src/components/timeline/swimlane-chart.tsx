@@ -370,10 +370,9 @@ export function SwimLaneChart() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const activeView = useUIStore((s) => s.activeView);
   const isActualTimeline = activeView === 'actual-timeline';
-  const isPotentialTimeline = activeView === 'potential-timeline';
   const rawOverlayPref = useUIStore((s) => s.showOpportunityOverlay);
-  // Potential timeline: always show overlay. Actual timeline: never show.
-  const showOpportunityOverlay = isPotentialTimeline ? true : (rawOverlayPref && !isActualTimeline);
+  // Actual timeline: never show overlay. Other views: respect user preference.
+  const showOpportunityOverlay = rawOverlayPref && !isActualTimeline;
   const setShowOpportunityOverlay = useUIStore((s) => s.setShowOpportunityOverlay);
   const opportunities = useOpportunityStore((s) => s.opportunities);
   const oppScenarios = useOpportunityStore((s) => s.scenarios);
@@ -1103,12 +1102,12 @@ export function SwimLaneChart() {
                 id="opp-overlay"
                 checked={showOpportunityOverlay}
                 onCheckedChange={setShowOpportunityOverlay}
-                disabled={isActualTimeline || isPotentialTimeline}
+                disabled={isActualTimeline}
                 className="scale-75"
               />
               <Label
                 htmlFor="opp-overlay"
-                className={`text-[11px] cursor-pointer whitespace-nowrap ${(isActualTimeline || isPotentialTimeline) ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}
+                className={`text-[11px] cursor-pointer whitespace-nowrap ${isActualTimeline ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}
               >
                 Show Pipeline
               </Label>

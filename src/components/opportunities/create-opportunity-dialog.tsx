@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -48,13 +49,20 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** If provided, pre-fills the form for editing */
   editingOpportunity?: Opportunity;
+  /** If provided, called after creating (instead of redirecting to detail page) */
+  onCreated?: (opportunity: Opportunity) => void;
+  /** If provided, overrides the default stage for new opportunities */
+  defaultStage?: PipelineStage;
 }
 
 export function CreateOpportunityDialog({
   open,
   onOpenChange,
   editingOpportunity,
+  onCreated,
+  defaultStage,
 }: Props) {
+  const addOpportunity = useOpportunityStore((s) => s.addOpportunity);
   const updateOpportunity = useOpportunityStore((s) => s.updateOpportunity);
   const isEditing = Boolean(editingOpportunity);
   const [isCreating, startCreateTransition] = useTransition();
@@ -64,11 +72,12 @@ export function CreateOpportunityDialog({
   const [projectName, setProjectName] = useState(editingOpportunity?.project_name ?? '');
   const [startDate, setStartDate] = useState(editingOpportunity?.start_date ?? format(addWeeks(now, 2), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(editingOpportunity?.end_date ?? format(addWeeks(now, 10), 'yyyy-MM-dd'));
-  const [stage, setStage] = useState<PipelineStage>(editingOpportunity?.stage ?? 'identified');
+  const [stage, setStage] = useState<PipelineStage>(editingOpportunity?.stage ?? defaultStage ?? 'identified');
   const [probability, setProbability] = useState(editingOpportunity?.probability ?? 25);
   const [estimatedValue, setEstimatedValue] = useState(editingOpportunity?.estimated_value?.toString() ?? '');
   const [color, setColor] = useState(editingOpportunity?.color ?? COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>(editingOpportunity?.required_skills ?? []);
+  const [isBet, setIsBet] = useState(editingOpportunity?.is_bet ?? false);
   const [notes, setNotes] = useState(editingOpportunity?.notes ?? '');
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -82,6 +91,7 @@ export function CreateOpportunityDialog({
       probability,
       estimated_value: estimatedValue ? Number(estimatedValue) : null,
       color,
+      is_bet: isBet,
       required_skills: requiredSkills,
       notes: notes || null,
       converted_engagement_id: null,
@@ -101,9 +111,23 @@ export function CreateOpportunityDialog({
       return;
     }
 
-    startCreateTransition(async () => {
-      await createOpportunityAndRedirect(data);
-    });
+    if (onCreated) {
+      setSavingEdit(true);
+      try {
+        const created = await addOpportunity(data as Omit<Opportunity, 'id'>);
+        onOpenChange(false);
+        resetForm();
+        onCreated(created);
+      } catch (e) {
+        console.error('Failed to create opportunity:', e);
+      } finally {
+        setSavingEdit(false);
+      }
+    } else {
+      startCreateTransition(async () => {
+        await createOpportunityAndRedirect(data);
+      });
+    }
   };
 
   const resetForm = () => {
@@ -115,6 +139,7 @@ export function CreateOpportunityDialog({
     setProbability(25);
     setEstimatedValue('');
     setColor(COLOR_PALETTE[0]);
+    setIsBet(false);
     setRequiredSkills([]);
     setNotes('');
   };
@@ -233,6 +258,14 @@ export function CreateOpportunityDialog({
                 />
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Bet</Label>
+              <p className="text-xs text-muted-foreground">Mark this opportunity as a strategic bet</p>
+            </div>
+            <Switch checked={isBet} onCheckedChange={setIsBet} />
           </div>
 
           <div className="space-y-2">
