@@ -34,10 +34,8 @@ export function OpportunityDetail({
   onDeleted,
 }: Props) {
   const router = useRouter();
-  const opportunity = useOpportunityStore((s) => s.getById(opportunityId));
-  const scenarios = useOpportunityStore((s) =>
-    s.scenarios.filter((sc) => sc.opportunity_id === opportunityId)
-  );
+  const opportunities = useOpportunityStore((s) => s.opportunities);
+  const allScenarios = useOpportunityStore((s) => s.scenarios);
   const activeScenarioId = useOpportunityStore((s) => s.activeScenarioId);
   const setActiveScenarioId = useOpportunityStore(
     (s) => s.setActiveScenarioId
@@ -51,6 +49,16 @@ export function OpportunityDetail({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newScenarioName, setNewScenarioName] = useState('');
+
+  const opportunity = useMemo(
+    () => opportunities.find((candidate) => candidate.id === opportunityId),
+    [opportunities, opportunityId]
+  );
+  const scenarios = useMemo(
+    () =>
+      allScenarios.filter((scenario) => scenario.opportunity_id === opportunityId),
+    [allScenarios, opportunityId]
+  );
 
   // Auto-select first scenario
   useEffect(() => {
