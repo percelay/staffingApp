@@ -113,7 +113,7 @@ export function CreateOpportunityDialog({
   const [stage, setStage] = useState<PipelineStage>(defaultStage ?? 'identified');
   const [probability, setProbability] = useState(25);
   const [estimatedValue, setEstimatedValue] = useState('');
-  const [color, setColor] = useState(OPPORTUNITY_COLOR_PALETTE[0]);
+  const [color, setColor] = useState<string>(OPPORTUNITY_COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [isBet, setIsBet] = useState(false);
   const [notes, setNotes] = useState('');

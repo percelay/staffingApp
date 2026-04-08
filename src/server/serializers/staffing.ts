@@ -73,6 +73,7 @@ type OpportunityRecord = {
   probability: number;
   estimatedValue: { toString(): string } | null;
   color: string;
+  isBet: boolean;
   notes: string | null;
   convertedEngagementId: string | null;
   requiredSkills: Array<{
@@ -179,6 +180,7 @@ export function serializeOpportunity(record: OpportunityRecord): Opportunity {
       : null,
     required_skills: record.requiredSkills.map((item) => item.skill.name),
     color: record.color,
+    is_bet: record.isBet,
     notes: record.notes,
     converted_engagement_id: record.convertedEngagementId,
   };
