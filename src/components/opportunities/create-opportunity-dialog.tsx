@@ -129,6 +129,7 @@ export function CreateOpportunityDialog({
   const [newAllocation, setNewAllocation] = useState(100);
   const [practiceFilter, setPracticeFilter] = useState<PracticeArea | 'all'>('all');
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -163,6 +164,7 @@ export function CreateOpportunityDialog({
     setNewRole('consultant');
     setNewAllocation(100);
     setPracticeFilter('all');
+    setSubmitError(null);
   }, [open, editingOpportunity, defaultScenario, defaultStage, defaultDates.endDate, defaultDates.startDate]);
 
   const availableConsultants = useMemo(
@@ -214,6 +216,8 @@ export function CreateOpportunityDialog({
   };
 
   const handleSubmit = async () => {
+    setSubmitError(null);
+
     const payload: OpportunityCreateInput = {
       client_name: clientName || 'New Client',
       project_name: projectName || 'New Opportunity',
@@ -250,6 +254,11 @@ export function CreateOpportunityDialog({
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to save opportunity:', error);
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save opportunity'
+      );
     } finally {
       setSaving(false);
     }
@@ -742,6 +751,11 @@ export function CreateOpportunityDialog({
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t bg-background px-6 py-4 sm:flex-row sm:justify-end sm:px-8">
+          {submitError ? (
+            <div className="mr-auto rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {submitError}
+            </div>
+          ) : null}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
