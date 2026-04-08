@@ -1,11 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { assignmentUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  parseRequestBody,
+  successResponse,
+} from '@/server/http';
+import { assignmentUpdateSchema } from '@/server/schemas/assignments';
 import {
   deleteAssignmentById,
   updateAssignmentFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/assignments-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,14 +32,14 @@ export const PATCH = withAuth(
     _auth,
     ctx: RouteContext<'/api/assignments/[id]'>
   ) => {
-  try {
-    const { id } = await ctx.params;
-    const input = await parseRequestBody(request, assignmentUpdateSchema);
-    const assignment = await updateAssignmentFromInput(id, input);
-    return Response.json(assignment);
-  } catch (err) {
-    return createErrorResponse(err);
-  }
+    try {
+      const { id } = await ctx.params;
+      const input = await parseRequestBody(request, assignmentUpdateSchema);
+      const assignment = await updateAssignmentFromInput(id, input);
+      return jsonResponse(assignment);
+    } catch (err) {
+      return createErrorResponse(err);
+    }
   }
 );
 
@@ -50,12 +55,12 @@ export const DELETE = withAuth(
     _auth,
     ctx: RouteContext<'/api/assignments/[id]'>
   ) => {
-  try {
-    const { id } = await ctx.params;
-    await deleteAssignmentById(id);
-    return Response.json({ success: true });
-  } catch (err) {
-    return createErrorResponse(err);
-  }
+    try {
+      const { id } = await ctx.params;
+      await deleteAssignmentById(id);
+      return successResponse();
+    } catch (err) {
+      return createErrorResponse(err);
+    }
   }
 );

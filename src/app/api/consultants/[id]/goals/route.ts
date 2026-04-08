@@ -1,8 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { consultantGoalsSchema } from '@/server/schemas/staffing';
-import { replaceConsultantGoalsFromInput } from '@/server/services/staffing-service';
+import {
+  createErrorResponse,
+  jsonResponse,
+  notFoundResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { consultantGoalsSchema } from '@/server/schemas/consultants';
+import { replaceConsultantGoalsFromInput } from '@/server/services/consultants-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +32,10 @@ export const PUT = withAuth(
       const consultant = await replaceConsultantGoalsFromInput(id, input);
 
       if (!consultant) {
-        return Response.json({ error: 'Consultant not found' }, { status: 404 });
+        return notFoundResponse('Consultant not found');
       }
 
-      return Response.json(consultant);
+      return jsonResponse(consultant);
     } catch (error) {
       return createErrorResponse(error);
     }

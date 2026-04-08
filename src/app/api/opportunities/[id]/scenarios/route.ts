@@ -1,11 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { scenarioCreateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  createdResponse,
+  jsonResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { scenarioCreateSchema } from '@/server/schemas/scenarios';
 import {
   createScenarioFromInput,
   getScenarios,
-} from '@/server/services/staffing-service';
+} from '@/server/services/scenarios-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +26,7 @@ export const GET = withAuth(
   ) => {
     const { id } = await ctx.params;
     const scenarios = await getScenarios(id);
-    return Response.json(scenarios);
+    return jsonResponse(scenarios);
   }
 );
 
@@ -40,7 +45,7 @@ export const POST = withAuth(
       const { id } = await ctx.params;
       const input = await parseRequestBody(request, scenarioCreateSchema);
       const scenario = await createScenarioFromInput(id, input);
-      return Response.json(scenario, { status: 201 });
+      return createdResponse(scenario);
     } catch (error) {
       return createErrorResponse(error);
     }

@@ -1,20 +1,26 @@
 import { create } from 'zustand';
-import { authFetchJson } from '../api/json-fetch';
+import {
+  createAssignment as createAssignmentResource,
+  deleteAssignment as deleteAssignmentResource,
+  fetchAssignments as fetchAssignmentsResource,
+  updateAssignment as updateAssignmentResource,
+} from '@/lib/api/resources/assignments';
 import type { Assignment } from '../types';
+import { getErrorMessage, type ResourceStatus } from './resource-state';
 
 interface AssignmentStore {
   assignments: Assignment[];
-  loading: boolean;
+  status: ResourceStatus;
+  error: string | null;
 
-  // Hydration
   setAssignments: (assignments: Assignment[]) => void;
   fetchAssignments: () => Promise<void>;
+  refetch: () => Promise<void>;
+  reset: () => void;
 
-  // Selectors
   getByConsultant: (consultantId: string) => Assignment[];
   getByEngagement: (engagementId: string) => Assignment[];
 
-  // Mutations (API-backed)
   createAssignment: (data: Omit<Assignment, 'id'>) => Promise<Assignment>;
   updateAssignment: (id: string, data: Partial<Assignment>) => Promise<void>;
   removeAssignment: (assignmentId: string) => Promise<void>;
@@ -28,68 +34,76 @@ interface AssignmentStore {
 
 export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   assignments: [],
-  loading: false,
+  status: 'idle',
+  error: null,
 
-  setAssignments: (assignments) => set({ assignments }),
+  setAssignments: (assignments) =>
+    set({ assignments, status: 'ready', error: null }),
 
   fetchAssignments: async () => {
-    set({ loading: true });
+    set({ status: 'loading', error: null });
     try {
-      const data = await authFetchJson<Assignment[]>('/api/assignments');
-      set({ assignments: data, loading: false });
+      const assignments = await fetchAssignmentsResource();
+      set({ assignments, status: 'ready', error: null });
     } catch (error) {
-      set({ loading: false });
+      set({ status: 'error', error: getErrorMessage(error) });
       throw error;
     }
   },
 
+  refetch: async () => get().fetchAssignments(),
+  reset: () => set({ assignments: [], status: 'idle', error: null }),
+
   getByConsultant: (consultantId) =>
-    get().assignments.filter((a) => a.consultant_id === consultantId),
+    get().assignments.filter(
+      (assignment) => assignment.consultant_id === consultantId
+    ),
   getByEngagement: (engagementId) =>
-    get().assignments.filter((a) => a.engagement_id === engagementId),
+    get().assignments.filter(
+      (assignment) => assignment.engagement_id === engagementId
+    ),
 
   createAssignment: async (data) => {
-    const created = await authFetchJson<Assignment>('/api/assignments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    set((s) => ({ assignments: [...s.assignments, created] }));
-    return created;
+    const assignment = await createAssignmentResource(data);
+    set((state) => ({
+      assignments: [...state.assignments, assignment],
+    }));
+    return assignment;
   },
 
   updateAssignment: async (id, data) => {
-    const updated = await authFetchJson<Assignment>(`/api/assignments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    set((s) => ({
-      assignments: s.assignments.map((a) => (a.id === id ? updated : a)),
+    const assignment = await updateAssignmentResource(id, data);
+    set((state) => ({
+      assignments: state.assignments.map((candidate) =>
+        candidate.id === id ? assignment : candidate
+      ),
     }));
   },
 
   removeAssignment: async (assignmentId) => {
-    await authFetchJson<{ success: boolean }>(`/api/assignments/${assignmentId}`, {
-      method: 'DELETE',
-    });
-    set((s) => ({
-      assignments: s.assignments.filter((a) => a.id !== assignmentId),
+    await deleteAssignmentResource(assignmentId);
+    set((state) => ({
+      assignments: state.assignments.filter(
+        (assignment) => assignment.id !== assignmentId
+      ),
     }));
   },
 
-  moveAssignment: async (assignmentId, newConsultantId, newStartDate, newEndDate) => {
-    const updated = await authFetchJson<Assignment>(`/api/assignments/${assignmentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        consultant_id: newConsultantId,
-        start_date: newStartDate,
-        end_date: newEndDate,
-      }),
+  moveAssignment: async (
+    assignmentId,
+    newConsultantId,
+    newStartDate,
+    newEndDate
+  ) => {
+    const assignment = await updateAssignmentResource(assignmentId, {
+      consultant_id: newConsultantId,
+      start_date: newStartDate,
+      end_date: newEndDate,
     });
-    set((s) => ({
-      assignments: s.assignments.map((a) => (a.id === assignmentId ? updated : a)),
+    set((state) => ({
+      assignments: state.assignments.map((candidate) =>
+        candidate.id === assignmentId ? assignment : candidate
+      ),
     }));
   },
 }));

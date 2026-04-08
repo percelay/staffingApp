@@ -1,8 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { tentativeAssignmentCreateSchema } from '@/server/schemas/staffing';
-import { createTentativeAssignmentFromInput } from '@/server/services/staffing-service';
+import {
+  createErrorResponse,
+  createdResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { tentativeAssignmentCreateSchema } from '@/server/schemas/scenarios';
+import { createTentativeAssignmentFromInput } from '@/server/services/scenarios-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,16 +19,17 @@ export const POST = withAuth(
     request: NextRequest,
     _auth,
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments'>
-  ) => {
+    ) => {
     try {
-      const { scenarioId } = await ctx.params;
+      const { id, scenarioId } = await ctx.params;
       const input = await parseRequestBody(request, tentativeAssignmentCreateSchema);
       const tentativeAssignment = await createTentativeAssignmentFromInput(
+        id,
         scenarioId,
         input
       );
 
-      return Response.json(tentativeAssignment, { status: 201 });
+      return createdResponse(tentativeAssignment);
     } catch (error) {
       return createErrorResponse(error);
     }

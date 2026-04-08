@@ -1,12 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { opportunityUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  notFoundResponse,
+  parseRequestBody,
+  successResponse,
+} from '@/server/http';
+import { opportunityUpdateSchema } from '@/server/schemas/opportunities';
 import {
   deleteOpportunityById,
   getOpportunity,
   updateOpportunityFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/opportunities-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +30,10 @@ export const GET = withAuth(
     const opportunity = await getOpportunity(id);
 
     if (!opportunity) {
-      return Response.json({ error: 'Opportunity not found' }, { status: 404 });
+      return notFoundResponse('Opportunity not found');
     }
 
-    return Response.json(opportunity);
+    return jsonResponse(opportunity);
   }
 );
 
@@ -47,10 +53,10 @@ export const PATCH = withAuth(
       const opportunity = await updateOpportunityFromInput(id, input);
 
       if (!opportunity) {
-        return Response.json({ error: 'Opportunity not found' }, { status: 404 });
+        return notFoundResponse('Opportunity not found');
       }
 
-      return Response.json(opportunity);
+      return jsonResponse(opportunity);
     } catch (error) {
       return createErrorResponse(error);
     }
@@ -69,6 +75,6 @@ export const DELETE = withAuth(
   ) => {
     const { id } = await ctx.params;
     await deleteOpportunityById(id);
-    return Response.json({ success: true });
+    return successResponse();
   }
 );

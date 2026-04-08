@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/server/repositories/staffing-repository', () => ({
+vi.mock('@/server/repositories', () => ({
   listAssignments: vi.fn(),
   listConsultants: vi.fn(),
   listEngagements: vi.fn(),
@@ -9,16 +9,11 @@ vi.mock('@/server/repositories/staffing-repository', () => ({
   listWellbeingSignals: vi.fn(),
 }));
 
-vi.mock('@/lib/data/seed', () => ({
-  generateSeedData: vi.fn(),
+vi.mock('@/server/demo/seed-data', () => ({
+  generateDemoSeedData: vi.fn(),
 }));
 
-vi.mock('@/lib/data/opportunity-seed', () => ({
-  generateOpportunitySeedData: vi.fn(),
-}));
-
-import { generateOpportunitySeedData } from '@/lib/data/opportunity-seed';
-import { generateSeedData } from '@/lib/data/seed';
+import { generateDemoSeedData } from '@/server/demo/seed-data';
 import {
   listAssignments,
   listConsultants,
@@ -26,7 +21,7 @@ import {
   listOpportunities,
   listScenarios,
   listWellbeingSignals,
-} from '@/server/repositories/staffing-repository';
+} from '@/server/repositories';
 import { getBootstrapPayload } from '@/server/services/bootstrap-service';
 
 describe('getBootstrapPayload', () => {
@@ -42,7 +37,7 @@ describe('getBootstrapPayload', () => {
     vi.mocked(listOpportunities).mockResolvedValue([]);
     vi.mocked(listScenarios).mockResolvedValue([]);
 
-    vi.mocked(generateSeedData).mockReturnValue({
+    vi.mocked(generateDemoSeedData).mockReturnValue({
       consultants: [
         {
           id: 'demo-consultant',
@@ -59,8 +54,6 @@ describe('getBootstrapPayload', () => {
       engagements: [],
       assignments: [],
       wellbeingSignals: [],
-    });
-    vi.mocked(generateOpportunitySeedData).mockReturnValue({
       opportunities: [],
       scenarios: [],
     });
@@ -108,7 +101,6 @@ describe('getBootstrapPayload', () => {
         avatar_url: 'https://example.com/db.svg',
       },
     ]);
-    expect(generateSeedData).not.toHaveBeenCalled();
-    expect(generateOpportunitySeedData).not.toHaveBeenCalled();
+    expect(generateDemoSeedData).not.toHaveBeenCalled();
   });
 });

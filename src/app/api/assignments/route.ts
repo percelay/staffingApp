@@ -1,10 +1,15 @@
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { assignmentCreateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  createdResponse,
+  jsonResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { assignmentCreateSchema } from '@/server/schemas/assignments';
 import {
   createAssignmentFromInput,
   getAssignments,
-} from '@/server/services/staffing-service';
+} from '@/server/services/assignments-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +23,7 @@ export const GET = withAuth('assignments', async (request) => {
   const consultantId = searchParams.get('consultantId');
   const engagementId = searchParams.get('engagementId');
   const assignments = await getAssignments({ consultantId, engagementId });
-  return Response.json(assignments);
+  return jsonResponse(assignments);
 });
 
 /**
@@ -39,7 +44,7 @@ export const POST = withAuth('assignments', async (request) => {
   try {
     const input = await parseRequestBody(request, assignmentCreateSchema);
     const assignment = await createAssignmentFromInput(input);
-    return Response.json(assignment, { status: 201 });
+    return createdResponse(assignment);
   } catch (err) {
     return createErrorResponse(err);
   }

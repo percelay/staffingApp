@@ -20,6 +20,11 @@ import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
 import {
+  getAvailableConsultants,
+  getConsultantMatches,
+  getTotalAllocation,
+} from '@/lib/selectors/staffing';
+import {
   formatAllocationAsManDays,
   getCurrentConsultantUtilization,
 } from '@/lib/utils/allocation';
@@ -37,7 +42,6 @@ import type { Assignment, AssignmentRole } from '@/lib/types/assignment';
 import type { WellbeingSignal } from '@/lib/types/wellbeing';
 import {
   AvailableStaffingConsultantCard,
-  getConsultantMatches,
 } from '@/components/staffing/shared/staffing-consultant-picker';
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -271,14 +275,13 @@ function EngagementDetail({
     setExpandedConsultantId(null);
   }
 
-  const assignedIds = new Set(engAssignments.map((a) => a.consultant_id));
-  const availableConsultants = consultants.filter((c) => {
-    if (assignedIds.has(c.id)) return false;
-    if (practiceFilter !== 'all' && c.practice_area !== practiceFilter) return false;
-    return true;
-  });
+  const availableConsultants = getAvailableConsultants(
+    consultants,
+    engAssignments,
+    practiceFilter
+  );
 
-  const totalAllocation = engAssignments.reduce((sum, a) => sum + a.allocation_percentage, 0);
+  const totalAllocation = getTotalAllocation(engAssignments);
   const weeks = differenceInWeeks(parseISO(engagement.end_date), parseISO(engagement.start_date));
 
   const handleSave = async () => {

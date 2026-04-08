@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/select';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
+import {
+  getAvailableConsultants,
+  getTeamSkillCoverage,
+  getTotalAllocation,
+} from '@/lib/selectors/staffing';
 import type { Opportunity, Scenario } from '@/lib/types/opportunity';
 import type { Consultant, PracticeArea } from '@/lib/types/consultant';
 import type { Assignment, AssignmentRole } from '@/lib/types/assignment';
@@ -59,24 +64,16 @@ export function ScenarioEditor({
   const [practiceFilter, setPracticeFilter] = useState<PracticeArea | 'all'>('all');
 
   const availableConsultants = useMemo(
-    () => {
-      const assignedIds = new Set(
-        scenario.tentative_assignments.map((ta) => ta.consultant_id)
-      );
-
-      return consultants.filter((c) => {
-        if (assignedIds.has(c.id)) return false;
-        if (practiceFilter !== 'all' && c.practice_area !== practiceFilter) return false;
-        return true;
-      });
-    },
+    () =>
+      getAvailableConsultants(
+        consultants,
+        scenario.tentative_assignments,
+        practiceFilter
+      ),
     [consultants, scenario.tentative_assignments, practiceFilter]
   );
 
-  const totalAllocation = scenario.tentative_assignments.reduce(
-    (sum, ta) => sum + ta.allocation_percentage,
-    0
-  );
+  const totalAllocation = getTotalAllocation(scenario.tentative_assignments);
 
   const handleAdd = async () => {
     if (!newConsultantId) return;
@@ -94,20 +91,14 @@ export function ScenarioEditor({
   };
 
   // Skill coverage
-  const teamSkills = useMemo(() => {
-    const skills = new Set<string>();
-    for (const ta of scenario.tentative_assignments) {
-      const c = consultants.find((c) => c.id === ta.consultant_id);
-      if (c) c.skills.forEach((s) => skills.add(s));
-    }
-    return skills;
-  }, [scenario.tentative_assignments, consultants]);
-
-  const coveredSkills = opportunity.required_skills.filter((s) =>
-    teamSkills.has(s)
-  );
-  const missingSkills = opportunity.required_skills.filter(
-    (s) => !teamSkills.has(s)
+  const { coveredSkills, missingSkills } = useMemo(
+    () =>
+      getTeamSkillCoverage(
+        consultants,
+        scenario.tentative_assignments,
+        opportunity.required_skills
+      ),
+    [consultants, opportunity.required_skills, scenario.tentative_assignments]
   );
 
   return (

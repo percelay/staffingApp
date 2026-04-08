@@ -16,13 +16,17 @@ Read `CLAUDE.md` before making architectural changes. It is the source of truth 
   - serializers own DTO mapping
   - schemas own request validation
 - Do not query Prisma directly from pages or client components.
+- Shared DTOs and enums live in `src/lib/contracts/*`; `src/lib/types/*` is for UI-facing helpers.
 - Keep DTOs in snake_case at the API/frontend boundary.
 - New route handlers should use:
   - `withAuth()` from `src/lib/api/rbac.ts`
   - `parseRequestBody()` from `src/server/http.ts`
   - `RouteContext<'/api/...'>` with awaited `ctx.params`
 - Dashboard data hydrates through `/api/bootstrap` inside `src/lib/stores/store-provider.tsx`.
+- Client stores should use typed API clients from `src/lib/api/resources/*`, not inline `fetch()` calls.
 - Demo-vs-database selection happens in `src/server/services/bootstrap-service.ts`, not inside individual stores.
+- Canonical demo/seed data lives in `src/server/demo/seed-data.ts`; keep Prisma seed paths aligned with it.
+- ESLint guardrails enforce: no `@/lib/db` outside repositories and no repository imports inside route handlers.
 
 ## Documentation Rule
 

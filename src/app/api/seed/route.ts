@@ -1,4 +1,5 @@
 import { withAuth } from '@/lib/api/rbac';
+import { jsonResponse } from '@/server/http';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,13 +10,13 @@ export const dynamic = 'force-dynamic';
  */
 export const POST = withAuth('seed', async () => {
   if (process.env.NODE_ENV === 'production') {
-    return Response.json(
+    return jsonResponse(
       { error: 'Seeding is disabled in production' },
       { status: 403 }
     );
   }
 
-  return Response.json({
+  return jsonResponse({
     message: 'Use `npx prisma db seed` to seed the database.',
     hint: 'Run this from the terminal, not via API.',
   });

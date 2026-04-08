@@ -3,6 +3,10 @@
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import {
+  getTeamSkillCoverage,
+  getTotalAllocation,
+} from '@/lib/selectors/staffing';
 import type { Opportunity, Scenario } from '@/lib/types/opportunity';
 import type { Consultant } from '@/lib/types/consultant';
 import type { Assignment } from '@/lib/types/assignment';
@@ -49,10 +53,7 @@ export function ScenarioComparison({
         .map((ta) => consultants.find((c) => c.id === ta.consultant_id))
         .filter((c): c is Consultant => c !== undefined);
 
-      const totalAllocation = sc.tentative_assignments.reduce(
-        (sum, ta) => sum + ta.allocation_percentage,
-        0
-      );
+      const totalAllocation = getTotalAllocation(sc.tentative_assignments);
 
       const avgBurnout =
         teamConsultants.length > 0
@@ -67,14 +68,15 @@ export function ScenarioComparison({
 
       const conflicts = getCapacityConflicts(sc, assignments);
 
-      const teamSkills = new Set(teamConsultants.flatMap((c) => c.skills));
-      const covered = opportunity.required_skills.filter((s) =>
-        teamSkills.has(s)
+      const { coveredSkills } = getTeamSkillCoverage(
+        consultants,
+        sc.tentative_assignments,
+        opportunity.required_skills
       );
       const skillCoverage =
         opportunity.required_skills.length > 0
           ? Math.round(
-              (covered.length / opportunity.required_skills.length) * 100
+              (coveredSkills.length / opportunity.required_skills.length) * 100
             )
           : 100;
 

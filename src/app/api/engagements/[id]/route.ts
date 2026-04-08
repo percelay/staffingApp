@@ -1,12 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { engagementUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  notFoundResponse,
+  parseRequestBody,
+  successResponse,
+} from '@/server/http';
+import { engagementUpdateSchema } from '@/server/schemas/engagements';
 import {
   deleteEngagementById,
   getEngagement,
   updateEngagementFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/engagements-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +31,10 @@ export const GET = withAuth(
     const engagement = await getEngagement(id);
 
     if (!engagement) {
-      return Response.json({ error: 'Engagement not found' }, { status: 404 });
+      return notFoundResponse('Engagement not found');
     }
 
-    return Response.json(engagement);
+    return jsonResponse(engagement);
   }
 );
 
@@ -51,10 +57,10 @@ export const PATCH = withAuth(
       const engagement = await updateEngagementFromInput(id, input);
 
       if (!engagement) {
-        return Response.json({ error: 'Engagement not found' }, { status: 404 });
+        return notFoundResponse('Engagement not found');
       }
 
-      return Response.json(engagement);
+      return jsonResponse(engagement);
     } catch (error) {
       return createErrorResponse(error);
     }
@@ -75,6 +81,6 @@ export const DELETE = withAuth(
   ) => {
     const { id } = await ctx.params;
     await deleteEngagementById(id);
-    return Response.json({ success: true });
+    return successResponse();
   }
 );

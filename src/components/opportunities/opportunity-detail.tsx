@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
+import { useOpportunityUIStore } from '@/lib/stores/opportunity-ui-store';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
@@ -36,8 +37,8 @@ export function OpportunityDetail({
   const router = useRouter();
   const opportunities = useOpportunityStore((s) => s.opportunities);
   const allScenarios = useOpportunityStore((s) => s.scenarios);
-  const activeScenarioId = useOpportunityStore((s) => s.activeScenarioId);
-  const setActiveScenarioId = useOpportunityStore(
+  const activeScenarioId = useOpportunityUIStore((s) => s.activeScenarioId);
+  const setActiveScenarioId = useOpportunityUIStore(
     (s) => s.setActiveScenarioId
   );
   const addScenario = useOpportunityStore((s) => s.addScenario);

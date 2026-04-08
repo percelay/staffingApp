@@ -3,8 +3,8 @@ import {
   getAssignments,
   getConsultants,
   getEngagements,
-  getWellbeingSignals,
-} from '@/server/services/staffing-service';
+} from '@/server/services';
+import { getWellbeingSignals } from '@/server/services/wellbeing-service';
 
 export async function getExecutiveSummary() {
   const [consultants, engagements, assignments, signals] = await Promise.all([

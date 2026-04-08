@@ -1,92 +1,106 @@
 import { create } from 'zustand';
 import { parseISO } from 'date-fns';
-import { authFetchJson } from '../api/json-fetch';
+import {
+  createEngagement,
+  deleteEngagement,
+  fetchEngagements as fetchEngagementsResource,
+  updateEngagement as updateEngagementResource,
+} from '@/lib/api/resources/engagements';
 import { normalizeEngagementStatus, type Engagement } from '../types';
 import { datesOverlap } from '../utils/date-helpers';
+import { getErrorMessage, type ResourceStatus } from './resource-state';
 
 interface EngagementStore {
   engagements: Engagement[];
-  loading: boolean;
+  status: ResourceStatus;
+  error: string | null;
 
-  // Hydration
   setEngagements: (engagements: Engagement[]) => void;
   fetchEngagements: () => Promise<void>;
+  refetch: () => Promise<void>;
+  reset: () => void;
 
-  // Selectors
   getById: (id: string) => Engagement | undefined;
   getActive: () => Engagement[];
   getByDateRange: (start: string, end: string) => Engagement[];
 
-  // Mutations (API-backed)
   addEngagement: (data: Omit<Engagement, 'id'>) => Promise<Engagement>;
   updateEngagement: (id: string, data: Partial<Engagement>) => Promise<void>;
   removeEngagement: (id: string) => Promise<void>;
 }
 
+function normalizeEngagement(engagement: Engagement): Engagement {
+  return {
+    ...engagement,
+    status: normalizeEngagementStatus(engagement.status),
+  };
+}
+
 export const useEngagementStore = create<EngagementStore>((set, get) => ({
   engagements: [],
-  loading: false,
+  status: 'idle',
+  error: null,
 
   setEngagements: (engagements) =>
     set({
-      engagements: engagements.map((engagement) => ({
-        ...engagement,
-        status: normalizeEngagementStatus(engagement.status),
-      })),
+      engagements: engagements.map(normalizeEngagement),
+      status: 'ready',
+      error: null,
     }),
 
   fetchEngagements: async () => {
-    set({ loading: true });
+    set({ status: 'loading', error: null });
     try {
-      const data = await authFetchJson<Engagement[]>('/api/engagements');
-      set({ engagements: data, loading: false });
+      const engagements = await fetchEngagementsResource();
+      set({
+        engagements: engagements.map(normalizeEngagement),
+        status: 'ready',
+        error: null,
+      });
     } catch (error) {
-      set({ loading: false });
+      set({ status: 'error', error: getErrorMessage(error) });
       throw error;
     }
   },
 
-  getById: (id) => get().engagements.find((e) => e.id === id),
+  refetch: async () => get().fetchEngagements(),
+  reset: () => set({ engagements: [], status: 'idle', error: null }),
+
+  getById: (id) => get().engagements.find((engagement) => engagement.id === id),
   getActive: () => {
     const now = new Date();
-    return get().engagements.filter((e) => {
-      const start = parseISO(e.start_date);
-      const end = parseISO(e.end_date);
+    return get().engagements.filter((engagement) => {
+      const start = parseISO(engagement.start_date);
+      const end = parseISO(engagement.end_date);
       return start <= now && end >= now;
     });
   },
   getByDateRange: (start, end) =>
-    get().engagements.filter((e) =>
-      datesOverlap(e.start_date, e.end_date, start, end)
+    get().engagements.filter((engagement) =>
+      datesOverlap(engagement.start_date, engagement.end_date, start, end)
     ),
 
   addEngagement: async (data) => {
-    const created = await authFetchJson<Engagement>('/api/engagements', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    set((s) => ({ engagements: [...s.engagements, created] }));
-    return created;
+    const engagement = normalizeEngagement(await createEngagement(data));
+    set((state) => ({ engagements: [...state.engagements, engagement] }));
+    return engagement;
   },
 
   updateEngagement: async (id, data) => {
-    const updated = await authFetchJson<Engagement>(`/api/engagements/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    set((s) => ({
-      engagements: s.engagements.map((e) => (e.id === id ? updated : e)),
+    const engagement = normalizeEngagement(
+      await updateEngagementResource(id, data)
+    );
+    set((state) => ({
+      engagements: state.engagements.map((candidate) =>
+        candidate.id === id ? engagement : candidate
+      ),
     }));
   },
 
   removeEngagement: async (id) => {
-    await authFetchJson<{ success: boolean }>(`/api/engagements/${id}`, {
-      method: 'DELETE',
-    });
-    set((s) => ({
-      engagements: s.engagements.filter((e) => e.id !== id),
+    await deleteEngagement(id);
+    set((state) => ({
+      engagements: state.engagements.filter((candidate) => candidate.id !== id),
     }));
   },
 }));

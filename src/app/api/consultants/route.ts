@@ -1,10 +1,15 @@
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { consultantCreateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  createdResponse,
+  jsonResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { consultantCreateSchema } from '@/server/schemas/consultants';
 import {
   createConsultantFromInput,
   getConsultants,
-} from '@/server/services/staffing-service';
+} from '@/server/services/consultants-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +27,7 @@ export const GET = withAuth('consultants', async (request) => {
     status: status === 'all' ? 'all' : status,
     practiceArea,
   });
-  return Response.json(consultants);
+  return jsonResponse(consultants);
 });
 
 /**
@@ -34,7 +39,7 @@ export const POST = withAuth('consultants', async (request) => {
   try {
     const input = await parseRequestBody(request, consultantCreateSchema);
     const consultant = await createConsultantFromInput(input);
-    return Response.json(consultant, { status: 201 });
+    return createdResponse(consultant);
   } catch (error) {
     return createErrorResponse(error);
   }

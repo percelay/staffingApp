@@ -1,10 +1,15 @@
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { opportunityCreateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  createdResponse,
+  jsonResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { opportunityCreateSchema } from '@/server/schemas/opportunities';
 import {
   createOpportunityFromInput,
   getOpportunities,
-} from '@/server/services/staffing-service';
+} from '@/server/services/opportunities-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +22,7 @@ export const GET = withAuth('opportunities', async (request) => {
   const { searchParams } = new URL(request.url);
   const stage = searchParams.get('stage');
   const opportunities = await getOpportunities({ stage });
-  return Response.json(opportunities);
+  return jsonResponse(opportunities);
 });
 
 /**
@@ -30,7 +35,7 @@ export const POST = withAuth('opportunities', async (request) => {
   try {
     const input = await parseRequestBody(request, opportunityCreateSchema);
     const opportunity = await createOpportunityFromInput(input);
-    return Response.json(opportunity, { status: 201 });
+    return createdResponse(opportunity);
   } catch (error) {
     return createErrorResponse(error);
   }

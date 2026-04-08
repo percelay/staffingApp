@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BootstrapSource } from '@/server/services/bootstrap-service';
+import type { BootstrapSource } from '@/lib/contracts/bootstrap';
 
 export type BootstrapStatus = 'idle' | 'loading' | 'ready' | 'error';
 

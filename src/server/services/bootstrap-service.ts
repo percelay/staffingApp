@@ -1,5 +1,5 @@
-import { generateOpportunitySeedData } from '@/lib/data/opportunity-seed';
-import { generateSeedData } from '@/lib/data/seed';
+import type { BootstrapPayload } from '@/lib/contracts/bootstrap';
+import { generateDemoSeedData } from '@/server/demo/seed-data';
 import {
   listAssignments,
   listConsultants,
@@ -7,7 +7,7 @@ import {
   listOpportunities,
   listScenarios,
   listWellbeingSignals,
-} from '@/server/repositories/staffing-repository';
+} from '@/server/repositories';
 import {
   serializeAssignment,
   serializeConsultant,
@@ -15,19 +15,9 @@ import {
   serializeOpportunity,
   serializeScenario,
   serializeWellbeingSignal,
-} from '@/server/serializers/staffing';
+} from '@/server/serializers';
 
-export type BootstrapSource = 'database' | 'demo';
-
-export type BootstrapPayload = {
-  source: BootstrapSource;
-  consultants: ReturnType<typeof serializeConsultant>[];
-  engagements: ReturnType<typeof serializeEngagement>[];
-  assignments: ReturnType<typeof serializeAssignment>[];
-  signals: ReturnType<typeof serializeWellbeingSignal>[];
-  opportunities: ReturnType<typeof serializeOpportunity>[];
-  scenarios: ReturnType<typeof serializeScenario>[];
-};
+export type { BootstrapSource } from '@/lib/contracts/bootstrap';
 
 export async function getBootstrapPayload(): Promise<BootstrapPayload> {
   try {
@@ -68,18 +58,16 @@ export async function getBootstrapPayload(): Promise<BootstrapPayload> {
 }
 
 function getDemoBootstrapPayload(): BootstrapPayload {
-  const { consultants, engagements, assignments, wellbeingSignals } =
-    generateSeedData();
-  const { opportunities, scenarios } = generateOpportunitySeedData();
+  const seed = generateDemoSeedData();
 
   return {
     source: 'demo',
-    consultants,
-    engagements,
-    assignments,
-    signals: wellbeingSignals,
-    opportunities,
-    scenarios,
+    consultants: seed.consultants,
+    engagements: seed.engagements,
+    assignments: seed.assignments,
+    signals: seed.wellbeingSignals,
+    opportunities: seed.opportunities,
+    scenarios: seed.scenarios,
   };
 }
 

@@ -1,12 +1,17 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { consultantUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  notFoundResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { consultantUpdateSchema } from '@/server/schemas/consultants';
 import {
   deleteConsultantById,
   getConsultant,
   updateConsultantFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/consultants-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +30,10 @@ export const GET = withAuth(
     const consultant = await getConsultant(id);
 
     if (!consultant) {
-      return Response.json({ error: 'Consultant not found' }, { status: 404 });
+      return notFoundResponse('Consultant not found');
     }
 
-    return Response.json(consultant);
+    return jsonResponse(consultant);
   }
 );
 
@@ -48,7 +53,7 @@ export const PATCH = withAuth(
       const { id } = await ctx.params;
       const input = await parseRequestBody(request, consultantUpdateSchema);
       const consultant = await updateConsultantFromInput(id, input);
-      return Response.json(consultant);
+      return jsonResponse(consultant);
     } catch (error) {
       return createErrorResponse(error);
     }
@@ -69,6 +74,6 @@ export const DELETE = withAuth(
   ) => {
     const { id } = await ctx.params;
     const consultant = await deleteConsultantById(id);
-    return Response.json(consultant);
+    return jsonResponse(consultant);
   }
 );

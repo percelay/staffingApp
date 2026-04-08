@@ -7,6 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Assignment } from '@/lib/types/assignment';
 import type { Consultant } from '@/lib/types/consultant';
+import {
+  getConsultantMatches,
+  hasNormalizedValue,
+} from '@/lib/selectors/staffing';
 import { PRACTICE_AREA_LABELS, SENIORITY_LABELS } from '@/lib/types/consultant';
 import { getAverageAvailability, getWeeklyAllocations } from '@/lib/utils/availability';
 import {
@@ -268,20 +272,6 @@ export function AvailabilityBar({
       })}
     </div>
   );
-}
-
-export function getConsultantMatches(source: string[], requiredSkills: string[]) {
-  if (source.length === 0 || requiredSkills.length === 0) {
-    return [];
-  }
-
-  const required = new Set(requiredSkills.map(normalizeSkillName));
-  return source.filter((item) => required.has(normalizeSkillName(item)));
-}
-
-export function hasNormalizedValue(source: string[], candidate: string) {
-  const normalizedCandidate = normalizeSkillName(candidate);
-  return source.some((item) => normalizeSkillName(item) === normalizedCandidate);
 }
 
 function ExpandedStaffingConsultantDetail({
@@ -745,10 +735,6 @@ function ConsultantFocusList({
       </div>
     </div>
   );
-}
-
-function normalizeSkillName(value: string) {
-  return value.trim().toLowerCase();
 }
 
 function isWeekAllocated(weekStart: Date, assignment: Assignment) {

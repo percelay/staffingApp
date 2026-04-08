@@ -30,6 +30,10 @@ import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useOpportunityStore } from '@/lib/stores/opportunity-store';
 import { useWellbeingStore } from '@/lib/stores/wellbeing-store';
+import {
+  getAvailableConsultants,
+  getTotalAllocation,
+} from '@/lib/selectors/staffing';
 import type {
   Opportunity,
   OpportunityCreateInput,
@@ -162,29 +166,12 @@ export function CreateOpportunityDialog({
   }, [open, editingOpportunity, defaultScenario, defaultStage, defaultDates.endDate, defaultDates.startDate]);
 
   const availableConsultants = useMemo(
-    () => {
-      const assignedIds = new Set(
-        defaultTeam.map((assignment) => assignment.consultant_id)
-      );
-
-      return consultants.filter((consultant) => {
-        if (assignedIds.has(consultant.id)) return false;
-        if (
-          practiceFilter !== 'all' &&
-          consultant.practice_area !== practiceFilter
-        ) {
-          return false;
-        }
-        return true;
-      });
-    },
+    () =>
+      getAvailableConsultants(consultants, defaultTeam, practiceFilter),
     [consultants, defaultTeam, practiceFilter]
   );
 
-  const totalAllocation = defaultTeam.reduce(
-    (sum, assignment) => sum + assignment.allocation_percentage,
-    0
-  );
+  const totalAllocation = getTotalAllocation(defaultTeam);
 
   const handleAddTeamMember = () => {
     if (!newConsultantId) {

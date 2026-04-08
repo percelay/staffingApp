@@ -1,5 +1,6 @@
 import { withAuth } from '@/lib/api/rbac';
-import { getSkills } from '@/server/services/staffing-service';
+import { jsonResponse } from '@/server/http';
+import { getSkills } from '@/server/services/skills-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,5 +11,5 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withAuth('skills', async () => {
   const skills = await getSkills();
-  return Response.json(skills);
+  return jsonResponse(skills);
 });

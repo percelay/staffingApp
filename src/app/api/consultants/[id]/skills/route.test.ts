@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/server/services/staffing-service', () => ({
+vi.mock('@/server/services/consultants-service', () => ({
   replaceConsultantSkillsFromInput: vi.fn(),
 }));
 
-import { replaceConsultantSkillsFromInput } from '@/server/services/staffing-service';
+import { replaceConsultantSkillsFromInput } from '@/server/services/consultants-service';
 import { PUT } from '@/app/api/consultants/[id]/skills/route';
 
 describe('PUT /api/consultants/[id]/skills', () => {

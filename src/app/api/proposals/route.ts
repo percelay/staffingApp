@@ -1,10 +1,15 @@
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { proposalCreateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  createdResponse,
+  jsonResponse,
+  parseRequestBody,
+} from '@/server/http';
+import { proposalCreateSchema } from '@/server/schemas/proposals';
 import {
   createProposalFromInput,
   getProposals,
-} from '@/server/services/staffing-service';
+} from '@/server/services/proposals-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +19,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withAuth('proposals', async () => {
   const proposals = await getProposals();
-  return Response.json(proposals);
+  return jsonResponse(proposals);
 });
 
 /**
@@ -26,7 +31,7 @@ export const POST = withAuth('proposals', async (request) => {
   try {
     const input = await parseRequestBody(request, proposalCreateSchema);
     const proposal = await createProposalFromInput(input);
-    return Response.json(proposal, { status: 201 });
+    return createdResponse(proposal);
   } catch (error) {
     return createErrorResponse(error);
   }

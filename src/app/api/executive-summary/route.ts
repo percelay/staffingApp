@@ -1,4 +1,5 @@
 import { withAuth } from '@/lib/api/rbac';
+import { jsonResponse } from '@/server/http';
 import { getExecutiveSummary } from '@/server/services/executive-summary-service';
 
 export const dynamic = 'force-dynamic';
@@ -11,5 +12,5 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withAuth('executive_summary', async () => {
   const summary = await getExecutiveSummary();
-  return Response.json(summary);
+  return jsonResponse(summary);
 });

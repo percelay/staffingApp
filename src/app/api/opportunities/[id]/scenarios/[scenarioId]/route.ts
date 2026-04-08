@@ -1,12 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { scenarioUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  notFoundResponse,
+  parseRequestBody,
+  successResponse,
+} from '@/server/http';
+import { scenarioUpdateSchema } from '@/server/schemas/scenarios';
 import {
   deleteScenarioById,
-  getScenario,
+  getScenarioForOpportunityById,
   updateScenarioFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/scenarios-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,14 +26,14 @@ export const GET = withAuth(
     _auth,
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]'>
   ) => {
-    const { scenarioId } = await ctx.params;
-    const scenario = await getScenario(scenarioId);
+    const { id, scenarioId } = await ctx.params;
+    const scenario = await getScenarioForOpportunityById(id, scenarioId);
 
     if (!scenario) {
-      return Response.json({ error: 'Scenario not found' }, { status: 404 });
+      return notFoundResponse('Scenario not found');
     }
 
-    return Response.json(scenario);
+    return jsonResponse(scenario);
   }
 );
 
@@ -43,15 +49,10 @@ export const PUT = withAuth(
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]'>
   ) => {
     try {
-      const { scenarioId } = await ctx.params;
+      const { id, scenarioId } = await ctx.params;
       const input = await parseRequestBody(request, scenarioUpdateSchema);
-      const scenario = await updateScenarioFromInput(scenarioId, input);
-
-      if (!scenario) {
-        return Response.json({ error: 'Scenario not found' }, { status: 404 });
-      }
-
-      return Response.json(scenario);
+      const scenario = await updateScenarioFromInput(id, scenarioId, input);
+      return jsonResponse(scenario);
     } catch (error) {
       return createErrorResponse(error);
     }
@@ -68,8 +69,8 @@ export const DELETE = withAuth(
     _auth,
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]'>
   ) => {
-    const { scenarioId } = await ctx.params;
-    await deleteScenarioById(scenarioId);
-    return Response.json({ success: true });
+    const { id, scenarioId } = await ctx.params;
+    await deleteScenarioById(id, scenarioId);
+    return successResponse();
   }
 );

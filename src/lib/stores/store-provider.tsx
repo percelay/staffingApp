@@ -1,25 +1,21 @@
 'use client';
 
 import { useEffect } from 'react';
-import { authFetch } from '../api/auth-fetch';
+import { fetchBootstrapPayload } from '@/lib/api/resources/bootstrap';
 import { useAppStore } from './app-store';
+import { useAssignmentStore } from './assignment-store';
 import { useAuthStore } from './auth-store';
 import { useConsultantStore } from './consultant-store';
 import { useEngagementStore } from './engagement-store';
-import { useAssignmentStore } from './assignment-store';
-import { useWellbeingStore } from './wellbeing-store';
 import { useOpportunityStore } from './opportunity-store';
+import { useOpportunityUIStore } from './opportunity-ui-store';
 import { useProposalStore } from './proposal-store';
+import { useWellbeingStore } from './wellbeing-store';
 
-/**
- * StoreProvider — hydrates domain stores for authenticated dashboard sessions.
- * Data source selection happens server-side via `/api/bootstrap`.
- */
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const currentUser = useAuthStore((s) => s.currentUser);
-  const currentUserId = currentUser?.id;
-  const bootstrapStatus = useAppStore((s) => s.bootstrapStatus);
-  const bootstrapError = useAppStore((s) => s.bootstrapError);
+  const currentUser = useAuthStore((store) => store.currentUser);
+  const bootstrapStatus = useAppStore((store) => store.bootstrapStatus);
+  const bootstrapError = useAppStore((store) => store.bootstrapError);
 
   useEffect(() => {
     if (!currentUser) {
@@ -35,13 +31,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       resetDomainStores();
 
       try {
-        const response = await authFetch('/api/bootstrap');
-
-        if (!response.ok) {
-          throw new Error(`Bootstrap request failed with ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await fetchBootstrapPayload();
 
         if (cancelled) {
           return;
@@ -53,10 +43,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         useWellbeingStore.getState().setSignals(data.signals);
         useOpportunityStore.getState().setOpportunities(data.opportunities);
         useOpportunityStore.getState().setScenarios(data.scenarios);
-        useOpportunityStore.setState({
-          selectedOpportunityId: null,
-          activeScenarioId: null,
-        });
+        useOpportunityUIStore.getState().reset();
         useProposalStore.getState().setSavedProposals([]);
         useAppStore.getState().setBootstrapReady(data.source);
       } catch (error) {
@@ -77,7 +64,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [currentUser, currentUserId]);
+  }, [currentUser]);
 
   if (bootstrapStatus === 'loading' || bootstrapStatus === 'idle') {
     return (
@@ -101,16 +88,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 }
 
 function resetDomainStores() {
-  useConsultantStore.setState({ consultants: [], loading: false });
-  useEngagementStore.setState({ engagements: [], loading: false });
-  useAssignmentStore.setState({ assignments: [], loading: false });
-  useWellbeingStore.setState({ signals: [], loading: false });
-  useOpportunityStore.setState({
-    opportunities: [],
-    loading: false,
-    selectedOpportunityId: null,
-    activeScenarioId: null,
-    scenarios: [],
-  });
+  useConsultantStore.getState().reset();
+  useEngagementStore.getState().reset();
+  useAssignmentStore.getState().reset();
+  useWellbeingStore.getState().reset();
+  useOpportunityStore.getState().reset();
+  useOpportunityUIStore.getState().reset();
   useProposalStore.getState().resetProposalState();
 }

@@ -1,11 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
-import { createErrorResponse, parseRequestBody } from '@/server/http';
-import { tentativeAssignmentUpdateSchema } from '@/server/schemas/staffing';
+import {
+  createErrorResponse,
+  jsonResponse,
+  parseRequestBody,
+  successResponse,
+} from '@/server/http';
+import { tentativeAssignmentUpdateSchema } from '@/server/schemas/scenarios';
 import {
   deleteTentativeAssignmentById,
   updateTentativeAssignmentFromInput,
-} from '@/server/services/staffing-service';
+} from '@/server/services/scenarios-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,16 +23,18 @@ export const PATCH = withAuth(
     request: NextRequest,
     _auth,
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments/[assignmentId]'>
-  ) => {
+    ) => {
     try {
-      const { assignmentId } = await ctx.params;
+      const { id, scenarioId, assignmentId } = await ctx.params;
       const input = await parseRequestBody(request, tentativeAssignmentUpdateSchema);
       const tentativeAssignment = await updateTentativeAssignmentFromInput(
+        id,
+        scenarioId,
         assignmentId,
         input
       );
 
-      return Response.json(tentativeAssignment);
+      return jsonResponse(tentativeAssignment);
     } catch (error) {
       return createErrorResponse(error);
     }
@@ -44,9 +51,9 @@ export const DELETE = withAuth(
     _auth,
     ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments/[assignmentId]'>
   ) => {
-    const { assignmentId } = await ctx.params;
-    await deleteTentativeAssignmentById(assignmentId);
+    const { id, scenarioId, assignmentId } = await ctx.params;
+    await deleteTentativeAssignmentById(id, scenarioId, assignmentId);
 
-    return Response.json({ success: true });
+    return successResponse();
   }
 );
