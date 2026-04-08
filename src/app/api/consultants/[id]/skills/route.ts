@@ -1,6 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toConsultantDTO } from '@/lib/api/transformers';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { consultantSkillsSchema } from '@/server/schemas/staffing';
+import { replaceConsultantSkillsFromInput } from '@/server/services/staffing-service';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * PUT /api/consultants/:id/skills
@@ -12,45 +16,25 @@ import { withAuth } from '@/lib/api/rbac';
  *   2. Create new ones from the provided array
  *   3. Auto-creates skills that don't exist yet
  */
-export const PUT = withAuth('consultants', async (request) => {
-  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
-  const { skills } = await request.json();
+export const PUT = withAuth(
+  'consultants',
+  async (
+    request: NextRequest,
+    _auth,
+    ctx: RouteContext<'/api/consultants/[id]/skills'>
+  ) => {
+    try {
+      const { id } = await ctx.params;
+      const input = await parseRequestBody(request, consultantSkillsSchema);
+      const consultant = await replaceConsultantSkillsFromInput(id, input);
 
-  if (!Array.isArray(skills)) {
-    return Response.json(
-      { error: 'skills must be an array of strings' },
-      { status: 400 }
-    );
-  }
+      if (!consultant) {
+        return Response.json({ error: 'Consultant not found' }, { status: 404 });
+      }
 
-  // Atomic: delete old, create new
-  await prisma.$transaction(async (tx) => {
-    // Remove all existing skills for this consultant
-    await tx.consultantSkill.deleteMany({
-      where: { consultantId: id },
-    });
-
-    // Add new skills (connectOrCreate ensures skill table stays in sync)
-    for (const skillName of skills) {
-      const skill = await tx.skill.upsert({
-        where: { name: skillName },
-        update: {},
-        create: { name: skillName },
-      });
-      await tx.consultantSkill.create({
-        data: {
-          consultantId: id,
-          skillId: skill.id,
-        },
-      });
+      return Response.json(consultant);
+    } catch (error) {
+      return createErrorResponse(error);
     }
-  });
-
-  // Return updated consultant
-  const consultant = await prisma.consultant.findUnique({
-    where: { id },
-    include: { skills: { include: { skill: true } }, goals: { include: { skill: true } } },
-  });
-
-  return Response.json(toConsultantDTO(consultant!));
-});
+  }
+);

@@ -1,6 +1,13 @@
-import { prisma } from '@/lib/db';
-import { toAssignmentDTO } from '@/lib/api/transformers';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { assignmentUpdateSchema } from '@/server/schemas/staffing';
+import {
+  deleteAssignmentById,
+  updateAssignmentFromInput,
+} from '@/server/services/staffing-service';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * PATCH /api/assignments/:id
@@ -13,45 +20,42 @@ import { withAuth } from '@/lib/api/rbac';
  *   - Change role:       { role: "manager" }
  *   - Reassign:          { consultant_id: "new-id" }
  */
-export const PATCH = withAuth('assignments', async (request) => {
+export const PATCH = withAuth(
+  'assignments',
+  async (
+    request: NextRequest,
+    _auth,
+    ctx: RouteContext<'/api/assignments/[id]'>
+  ) => {
   try {
-    const id = request.url.split('/api/assignments/')[1]?.split('/')[0]?.split('?')[0];
-    const body = await request.json();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = {};
-    if (body.consultant_id !== undefined) data.consultantId = body.consultant_id;
-    if (body.engagement_id !== undefined) data.engagementId = body.engagement_id;
-    if (body.role !== undefined) data.role = body.role;
-    if (body.start_date !== undefined) data.startDate = new Date(body.start_date);
-    if (body.end_date !== undefined) data.endDate = new Date(body.end_date);
-    if (body.allocation_percentage !== undefined) data.allocationPercentage = body.allocation_percentage;
-    if (body.notes !== undefined) data.notes = body.notes;
-
-    const assignment = await prisma.assignment.update({
-      where: { id },
-      data,
-    });
-
-    return Response.json(toAssignmentDTO(assignment));
+    const { id } = await ctx.params;
+    const input = await parseRequestBody(request, assignmentUpdateSchema);
+    const assignment = await updateAssignmentFromInput(id, input);
+    return Response.json(assignment);
   } catch (err) {
-    console.error('[PATCH /api/assignments/:id]', err);
-    return Response.json({ error: 'Failed to update assignment' }, { status: 500 });
+    return createErrorResponse(err);
   }
-});
+  }
+);
 
 /**
  * DELETE /api/assignments/:id
  * Remove a consultant from a project.
  * Their utilization automatically decreases.
  */
-export const DELETE = withAuth('assignments', async (request) => {
+export const DELETE = withAuth(
+  'assignments',
+  async (
+    _request: NextRequest,
+    _auth,
+    ctx: RouteContext<'/api/assignments/[id]'>
+  ) => {
   try {
-    const id = request.url.split('/api/assignments/')[1]?.split('/')[0]?.split('?')[0];
-    await prisma.assignment.delete({ where: { id } });
+    const { id } = await ctx.params;
+    await deleteAssignmentById(id);
     return Response.json({ success: true });
   } catch (err) {
-    console.error('[DELETE /api/assignments/:id]', err);
-    return Response.json({ error: 'Failed to delete assignment' }, { status: 500 });
+    return createErrorResponse(err);
   }
-});
+  }
+);

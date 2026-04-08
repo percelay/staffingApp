@@ -8,7 +8,7 @@ import type { Consultant } from '@/lib/types/consultant';
 import type { Assignment } from '@/lib/types/assignment';
 import type { WellbeingSignal } from '@/lib/types/wellbeing';
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
-import { getCurrentConsultantUtilization, formatAllocationAsManDays } from '@/lib/utils/allocation';
+import { formatAllocationAsManDays } from '@/lib/utils/allocation';
 import { getCapacityConflicts } from '@/lib/utils/impact';
 import { cn } from '@/lib/utils';
 

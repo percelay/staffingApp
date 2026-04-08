@@ -1,127 +1,116 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { authFetch } from '../api/auth-fetch';
-import { generateSeedData } from '../data/seed';
-import { generateOpportunitySeedData } from '../data/opportunity-seed';
+import { useAppStore } from './app-store';
+import { useAuthStore } from './auth-store';
 import { useConsultantStore } from './consultant-store';
 import { useEngagementStore } from './engagement-store';
 import { useAssignmentStore } from './assignment-store';
 import { useWellbeingStore } from './wellbeing-store';
 import { useOpportunityStore } from './opportunity-store';
+import { useProposalStore } from './proposal-store';
 
 /**
- * StoreProvider — initializes all Zustand stores on mount.
- *
- * Strategy:
- *   1. Try to fetch from the database API (/api/consultants, etc.)
- *   2. If the API returns data, use it (database is connected and seeded)
- *   3. If the API fails or returns empty, fall back to faker seed data
- *      so the app always works — even without a database.
+ * StoreProvider — hydrates domain stores for authenticated dashboard sessions.
+ * Data source selection happens server-side via `/api/bootstrap`.
  */
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const initialized = useRef(false);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const currentUserId = currentUser?.id;
+  const bootstrapStatus = useAppStore((s) => s.bootstrapStatus);
+  const bootstrapError = useAppStore((s) => s.bootstrapError);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!currentUser) {
+      resetDomainStores();
+      useAppStore.getState().resetBootstrap();
+      return;
+    }
 
-    async function loadFromAPI() {
+    let cancelled = false;
+
+    async function loadBootstrapData() {
+      useAppStore.getState().setBootstrapLoading();
+      resetDomainStores();
+
       try {
-        const [consultantsRes, engagementsRes, assignmentsRes, wellbeingRes] =
-          await Promise.all([
-            authFetch('/api/consultants'),
-            authFetch('/api/engagements'),
-            authFetch('/api/assignments'),
-            authFetch('/api/wellbeing'),
-          ]);
+        const response = await authFetch('/api/bootstrap');
 
-        // If any request fails, fall back to seed data
-        if (
-          !consultantsRes.ok ||
-          !engagementsRes.ok ||
-          !assignmentsRes.ok ||
-          !wellbeingRes.ok
-        ) {
-          throw new Error('API returned non-OK status');
+        if (!response.ok) {
+          throw new Error(`Bootstrap request failed with ${response.status}`);
         }
 
-        const [consultants, engagements, assignments, signals] =
-          await Promise.all([
-            consultantsRes.json(),
-            engagementsRes.json(),
-            assignmentsRes.json(),
-            wellbeingRes.json(),
-          ]);
+        const data = await response.json();
 
-        // If the database is empty (not yet seeded), fall back
-        if (consultants.length === 0 && engagements.length === 0) {
-          throw new Error('Database is empty — using seed data');
+        if (cancelled) {
+          return;
         }
 
-        useConsultantStore.getState().setConsultants(consultants);
-        useEngagementStore.getState().setEngagements(engagements);
-        useAssignmentStore.getState().setAssignments(assignments);
-        useWellbeingStore.getState().setSignals(signals);
-
-        // Try to load opportunities and scenarios from API; fall back to seed
-        try {
-          const [oppRes, scenarioRes] = await Promise.all([
-            authFetch('/api/opportunities'),
-            authFetch('/api/opportunities/scenarios'),
-          ]);
-
-          if (oppRes.ok) {
-            const opportunities = await oppRes.json();
-            if (opportunities.length > 0) {
-              const opportunityStore = useOpportunityStore.getState();
-              opportunityStore.setOpportunities(opportunities);
-
-              if (scenarioRes.ok) {
-                const scenarios = await scenarioRes.json();
-                opportunityStore.setScenarios(scenarios);
-              } else {
-                opportunityStore.setScenarios([]);
-              }
-
-              console.log(
-                '[StoreProvider] Loaded from database API (with opportunities)'
-              );
-              return;
-            }
-          }
-        } catch {
-          // Opportunity API not available — fall through to seed
+        useConsultantStore.getState().setConsultants(data.consultants);
+        useEngagementStore.getState().setEngagements(data.engagements);
+        useAssignmentStore.getState().setAssignments(data.assignments);
+        useWellbeingStore.getState().setSignals(data.signals);
+        useOpportunityStore.getState().setOpportunities(data.opportunities);
+        useOpportunityStore.getState().setScenarios(data.scenarios);
+        useOpportunityStore.setState({
+          selectedOpportunityId: null,
+          activeScenarioId: null,
+        });
+        useProposalStore.getState().setSavedProposals([]);
+        useAppStore.getState().setBootstrapReady(data.source);
+      } catch (error) {
+        if (cancelled) {
+          return;
         }
 
-        // Seed opportunities even when main data comes from DB
-        loadOpportunitySeed();
-        console.log('[StoreProvider] Loaded from database API');
-      } catch {
-        // Fallback: use in-memory faker seed data
-        const { consultants, engagements, assignments, wellbeingSignals } =
-          generateSeedData();
-
-        useConsultantStore.getState().setConsultants(consultants);
-        useEngagementStore.getState().setEngagements(engagements);
-        useAssignmentStore.getState().setAssignments(assignments);
-        useWellbeingStore.getState().setSignals(wellbeingSignals);
-
-        loadOpportunitySeed();
-        console.log('[StoreProvider] Using in-memory seed data (no database)');
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to load staffing data';
+        useAppStore.getState().setBootstrapError(message);
       }
     }
 
-    function loadOpportunitySeed() {
-      const { opportunities, scenarios } = generateOpportunitySeedData();
-      const store = useOpportunityStore.getState();
-      store.setOpportunities(opportunities);
-      // Hydrate scenarios directly into the store
-      useOpportunityStore.setState({ scenarios });
-    }
+    void loadBootstrapData();
 
-    loadFromAPI();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, currentUserId]);
+
+  if (bootstrapStatus === 'loading' || bootstrapStatus === 'idle') {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 text-sm text-slate-600">
+        Loading staffing data...
+      </div>
+    );
+  }
+
+  if (bootstrapStatus === 'error') {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50">
+        <div className="rounded-xl border bg-white px-5 py-4 text-sm text-slate-700 shadow-sm">
+          {bootstrapError || 'Unable to load staffing data.'}
+        </div>
+      </div>
+    );
+  }
 
   return <>{children}</>;
+}
+
+function resetDomainStores() {
+  useConsultantStore.setState({ consultants: [], loading: false });
+  useEngagementStore.setState({ engagements: [], loading: false });
+  useAssignmentStore.setState({ assignments: [], loading: false });
+  useWellbeingStore.setState({ signals: [], loading: false });
+  useOpportunityStore.setState({
+    opportunities: [],
+    loading: false,
+    selectedOpportunityId: null,
+    activeScenarioId: null,
+    scenarios: [],
+  });
+  useProposalStore.getState().resetProposalState();
 }

@@ -49,8 +49,9 @@ const EFFORT_METER_SEGMENTS = 5;
 
 const ENGAGEMENT_STATUS_ORDER: Record<EngagementStatus, number> = {
   active: 0,
-  upcoming: 1,
-  completed: 2,
+  at_risk: 1,
+  upcoming: 2,
+  completed: 3,
 };
 
 type TimelineViewMode = 'consultants' | 'projects';

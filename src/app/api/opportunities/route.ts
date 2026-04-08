@@ -1,8 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toOpportunityDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
-import { normalizePipelineStage } from '@/lib/types/opportunity';
-import { normalizeIsoDateRange } from '@/lib/utils/date-helpers';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { opportunityCreateSchema } from '@/server/schemas/staffing';
+import {
+  createOpportunityFromInput,
+  getOpportunities,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,106 +16,22 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth('opportunities', async (request) => {
   const { searchParams } = new URL(request.url);
   const stage = searchParams.get('stage');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
-  if (stage) {
-    where.stage = normalizePipelineStage(stage);
-  }
-
-  const opportunities = await prisma.opportunity.findMany({
-    where,
-    include: {
-      requiredSkills: { include: { skill: true } },
-    },
-    orderBy: { startDate: 'asc' },
-  });
-
-  return Response.json(opportunities.map(toOpportunityDTO));
+  const opportunities = await getOpportunities({ stage });
+  return Response.json(opportunities);
 });
 
 /**
  * POST /api/opportunities
- * Create a new opportunity with a default staffing scenario.
+ * Create a new opportunity.
+ * Body: { client_name, project_name, start_date, end_date, stage, probability,
+ *         estimated_value, color, notes, required_skills: string[] }
  */
 export const POST = withAuth('opportunities', async (request) => {
-  const body = await request.json();
-  const { required_skills = [], default_scenario, ...rest } = body;
-  const normalizedOpportunityDates = normalizeIsoDateRange(
-    rest.start_date,
-    rest.end_date
-  );
-
-  if (!normalizedOpportunityDates) {
-    return Response.json(
-      { error: 'Invalid opportunity date range' },
-      { status: 400 }
-    );
+  try {
+    const input = await parseRequestBody(request, opportunityCreateSchema);
+    const opportunity = await createOpportunityFromInput(input);
+    return Response.json(opportunity, { status: 201 });
+  } catch (error) {
+    return createErrorResponse(error);
   }
-
-  const opportunity = await prisma.$transaction(async (tx) => {
-    const created = await tx.opportunity.create({
-      data: {
-        clientName: rest.client_name,
-        projectName: rest.project_name,
-        startDate: new Date(normalizedOpportunityDates.startDate),
-        endDate: new Date(normalizedOpportunityDates.endDate),
-        stage: rest.stage ? normalizePipelineStage(rest.stage) : 'identified',
-        probability: rest.probability ?? 25,
-        estimatedValue: rest.estimated_value ?? null,
-        color: rest.color || '#6366F1',
-        isBet: rest.is_bet ?? false,
-        notes: rest.notes ?? null,
-        requiredSkills: {
-          create: required_skills.map((skillName: string) => ({
-            skill: {
-              connectOrCreate: {
-                where: { name: skillName },
-                create: { name: skillName },
-              },
-            },
-          })),
-        },
-      },
-      include: {
-        requiredSkills: { include: { skill: true } },
-      },
-    });
-
-    await tx.scenario.create({
-      data: {
-        opportunityId: created.id,
-        name: default_scenario?.name?.trim() || 'Primary Team',
-        isDefault: true,
-        tentativeAssignments: {
-          create: (default_scenario?.tentative_assignments ?? []).flatMap(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (assignment: any) => {
-              const normalizedAssignmentDates = normalizeIsoDateRange(
-                assignment.start_date || normalizedOpportunityDates.startDate,
-                assignment.end_date || normalizedOpportunityDates.endDate
-              );
-              if (!normalizedAssignmentDates) {
-                return [];
-              }
-
-              return [
-                {
-                  consultantId: assignment.consultant_id,
-                  role: assignment.role,
-                  startDate: new Date(normalizedAssignmentDates.startDate),
-                  endDate: new Date(normalizedAssignmentDates.endDate),
-                  allocationPercentage: assignment.allocation_percentage ?? 100,
-                },
-              ];
-            }
-          ),
-        },
-      },
-    });
-
-    return created;
-  });
-
-  return Response.json(toOpportunityDTO(opportunity), { status: 201 });
 });

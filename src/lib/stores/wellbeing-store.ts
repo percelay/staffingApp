@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import type { WellbeingSignal } from '../types';
 
 interface WellbeingStore {
@@ -26,9 +26,13 @@ export const useWellbeingStore = create<WellbeingStore>((set, get) => ({
 
   fetchSignals: async () => {
     set({ loading: true });
-    const res = await authFetch('/api/wellbeing');
-    const data = await res.json();
-    set({ signals: data, loading: false });
+    try {
+      const data = await authFetchJson<WellbeingSignal[]>('/api/wellbeing');
+      set({ signals: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   getByConsultant: (consultantId) =>
@@ -37,12 +41,11 @@ export const useWellbeingStore = create<WellbeingStore>((set, get) => ({
     get().signals.filter((s) => s.severity === 'high'),
 
   addSignal: async (data) => {
-    const res = await authFetch('/api/wellbeing', {
+    const created = await authFetchJson<WellbeingSignal>('/api/wellbeing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const created = await res.json();
     set((s) => ({ signals: [...s.signals, created] }));
   },
 }));

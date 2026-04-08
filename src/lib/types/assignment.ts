@@ -1,4 +1,11 @@
-export type AssignmentRole = 'lead' | 'manager' | 'consultant' | 'analyst';
+export const ASSIGNMENT_ROLE_VALUES = [
+  'lead',
+  'manager',
+  'consultant',
+  'analyst',
+] as const;
+
+export type AssignmentRole = (typeof ASSIGNMENT_ROLE_VALUES)[number];
 
 export interface Assignment {
   id: string;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import type { Consultant, PracticeArea, SeniorityLevel } from '../types';
 
 interface ConsultantStore {
@@ -31,9 +31,13 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
 
   fetchConsultants: async () => {
     set({ loading: true });
-    const res = await authFetch('/api/consultants');
-    const data = await res.json();
-    set({ consultants: data, loading: false });
+    try {
+      const data = await authFetchJson<Consultant[]>('/api/consultants');
+      set({ consultants: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   getById: (id) => get().consultants.find((c) => c.id === id),
@@ -43,54 +47,50 @@ export const useConsultantStore = create<ConsultantStore>((set, get) => ({
     get().consultants.filter((c) => c.seniority_level === level),
 
   addConsultant: async (data) => {
-    const res = await authFetch('/api/consultants', {
+    const created = await authFetchJson<Consultant>('/api/consultants', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const created = await res.json();
     set((s) => ({ consultants: [...s.consultants, created] }));
     return created;
   },
 
   updateConsultant: async (id, data) => {
-    const res = await authFetch(`/api/consultants/${id}`, {
+    const updated = await authFetchJson<Consultant>(`/api/consultants/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const updated = await res.json();
     set((s) => ({
       consultants: s.consultants.map((c) => (c.id === id ? updated : c)),
     }));
   },
 
   removeConsultant: async (id) => {
-    await authFetch(`/api/consultants/${id}`, { method: 'DELETE' });
+    await authFetchJson<Consultant>(`/api/consultants/${id}`, { method: 'DELETE' });
     set((s) => ({
       consultants: s.consultants.filter((c) => c.id !== id),
     }));
   },
 
   updateSkills: async (id, skills) => {
-    const res = await authFetch(`/api/consultants/${id}/skills`, {
+    const updated = await authFetchJson<Consultant>(`/api/consultants/${id}/skills`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skills }),
     });
-    const updated = await res.json();
     set((s) => ({
       consultants: s.consultants.map((c) => (c.id === id ? updated : c)),
     }));
   },
 
   updateGoals: async (id, goals) => {
-    const res = await authFetch(`/api/consultants/${id}/goals`, {
+    const updated = await authFetchJson<Consultant>(`/api/consultants/${id}/goals`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goals }),
     });
-    const updated = await res.json();
     set((s) => ({
       consultants: s.consultants.map((c) => (c.id === id ? updated : c)),
     }));

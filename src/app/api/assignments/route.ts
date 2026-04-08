@@ -1,6 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toAssignmentDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { assignmentCreateSchema } from '@/server/schemas/staffing';
+import {
+  createAssignmentFromInput,
+  getAssignments,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,18 +17,8 @@ export const GET = withAuth('assignments', async (request) => {
   const { searchParams } = new URL(request.url);
   const consultantId = searchParams.get('consultantId');
   const engagementId = searchParams.get('engagementId');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
-  if (consultantId) where.consultantId = consultantId;
-  if (engagementId) where.engagementId = engagementId;
-
-  const assignments = await prisma.assignment.findMany({
-    where,
-    orderBy: { startDate: 'asc' },
-  });
-
-  return Response.json(assignments.map(toAssignmentDTO));
+  const assignments = await getAssignments({ consultantId, engagementId });
+  return Response.json(assignments);
 });
 
 /**
@@ -43,23 +37,10 @@ export const GET = withAuth('assignments', async (request) => {
  */
 export const POST = withAuth('assignments', async (request) => {
   try {
-    const body = await request.json();
-
-    const assignment = await prisma.assignment.create({
-      data: {
-        consultantId: body.consultant_id,
-        engagementId: body.engagement_id,
-        role: body.role,
-        startDate: new Date(body.start_date),
-        endDate: new Date(body.end_date),
-        allocationPercentage: body.allocation_percentage ?? 100,
-        notes: body.notes || null,
-      },
-    });
-
-    return Response.json(toAssignmentDTO(assignment), { status: 201 });
+    const input = await parseRequestBody(request, assignmentCreateSchema);
+    const assignment = await createAssignmentFromInput(input);
+    return Response.json(assignment, { status: 201 });
   } catch (err) {
-    console.error('[POST /api/assignments]', err);
-    return Response.json({ error: 'Failed to create assignment' }, { status: 500 });
+    return createErrorResponse(err);
   }
 });

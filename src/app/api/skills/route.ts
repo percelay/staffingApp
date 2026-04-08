@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/db';
 import { withAuth } from '@/lib/api/rbac';
+import { getSkills } from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +9,6 @@ export const dynamic = 'force-dynamic';
  * Used for autocomplete/dropdown in forms.
  */
 export const GET = withAuth('skills', async () => {
-  const skills = await prisma.skill.findMany({
-    orderBy: { name: 'asc' },
-  });
-
-  return Response.json(skills.map((s) => s.name));
+  const skills = await getSkills();
+  return Response.json(skills);
 });

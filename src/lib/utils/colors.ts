@@ -1,16 +1,8 @@
 import type { SeniorityLevel } from '../types';
+import { ENGAGEMENT_COLOR_PALETTE } from '../constants/staffing';
 
 // 8 distinct, accessible client engagement colors
-export const CLIENT_COLORS = [
-  '#4F46E5', // Indigo
-  '#0891B2', // Cyan
-  '#059669', // Emerald
-  '#D97706', // Amber
-  '#DC2626', // Red
-  '#7C3AED', // Violet
-  '#DB2777', // Pink
-  '#2563EB', // Blue
-] as const;
+export const CLIENT_COLORS = ENGAGEMENT_COLOR_PALETTE;
 
 // Deterministic color assignment by client name
 export function getClientColor(clientName: string): string {

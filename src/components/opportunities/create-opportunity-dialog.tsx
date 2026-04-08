@@ -21,6 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  CONSULTING_SKILLS,
+  OPPORTUNITY_COLOR_PALETTE,
+} from '@/lib/constants/staffing';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
@@ -43,42 +47,6 @@ import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor } from '@/lib/utils/colors';
 import { cn } from '@/lib/utils';
 import { AvailableStaffingConsultantCard } from '@/components/staffing/shared/staffing-consultant-picker';
-
-const ALL_SKILLS = [
-  'Financial Modeling',
-  'Change Management',
-  'Data Analytics',
-  'Due Diligence',
-  'Process Optimization',
-  'Digital Strategy',
-  'Stakeholder Management',
-  'Market Analysis',
-  'Risk Assessment',
-  'Supply Chain',
-  'M&A Integration',
-  'Cost Reduction',
-  'Agile Transformation',
-  'Cloud Migration',
-  'People Analytics',
-  'Regulatory Compliance',
-  'Revenue Growth',
-  'Customer Experience',
-  'Organizational Design',
-  'Performance Management',
-];
-
-const COLOR_PALETTE = [
-  '#6366F1',
-  '#0891B2',
-  '#059669',
-  '#D97706',
-  '#DC2626',
-  '#7C3AED',
-  '#DB2777',
-  '#2563EB',
-  '#EA580C',
-  '#65A30D',
-];
 
 interface DraftTentativeAssignment extends TentativeAssignmentInput {
   id: string;
@@ -145,7 +113,7 @@ export function CreateOpportunityDialog({
   const [stage, setStage] = useState<PipelineStage>(defaultStage ?? 'identified');
   const [probability, setProbability] = useState(25);
   const [estimatedValue, setEstimatedValue] = useState('');
-  const [color, setColor] = useState(COLOR_PALETTE[0]);
+  const [color, setColor] = useState(OPPORTUNITY_COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [isBet, setIsBet] = useState(false);
   const [notes, setNotes] = useState('');
@@ -174,7 +142,7 @@ export function CreateOpportunityDialog({
     setStage(editingOpportunity?.stage ?? defaultStage ?? 'identified');
     setProbability(editingOpportunity?.probability ?? 25);
     setEstimatedValue(editingOpportunity?.estimated_value?.toString() ?? '');
-    setColor(editingOpportunity?.color ?? COLOR_PALETTE[0]);
+    setColor(editingOpportunity?.color ?? OPPORTUNITY_COLOR_PALETTE[0]);
     setRequiredSkills(editingOpportunity?.required_skills ?? []);
     setIsBet(editingOpportunity?.is_bet ?? false);
     setNotes(editingOpportunity?.notes ?? '');
@@ -404,7 +372,7 @@ export function CreateOpportunityDialog({
                 <div className="space-y-2">
                   <Label className="text-xs">Color</Label>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {COLOR_PALETTE.map((paletteColor) => (
+                    {OPPORTUNITY_COLOR_PALETTE.map((paletteColor) => (
                       <button
                         key={paletteColor}
                         type="button"
@@ -435,7 +403,7 @@ export function CreateOpportunityDialog({
                 <Label className="text-xs">Required Skills</Label>
                 <div className="max-h-40 overflow-y-auto rounded-md border p-4">
                   <div className="flex flex-wrap gap-1.5">
-                    {ALL_SKILLS.map((skill) => (
+                    {CONSULTING_SKILLS.map((skill) => (
                       <Badge
                         key={skill}
                         variant={

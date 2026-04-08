@@ -1,6 +1,8 @@
-import { prisma } from '@/lib/db';
-import { toTentativeAssignmentDTO } from '@/lib/api/transformers';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { tentativeAssignmentCreateSchema } from '@/server/schemas/staffing';
+import { createTentativeAssignmentFromInput } from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,26 +12,21 @@ export const dynamic = 'force-dynamic';
 export const POST = withAuth(
   'opportunities',
   async (
-    request,
+    request: NextRequest,
     _auth,
-    context: { params: Promise<{ id: string; scenarioId: string }> }
+    ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments'>
   ) => {
-    const { scenarioId } = await context.params;
-    const body = await request.json();
-
-    const tentativeAssignment = await prisma.tentativeAssignment.create({
-      data: {
+    try {
+      const { scenarioId } = await ctx.params;
+      const input = await parseRequestBody(request, tentativeAssignmentCreateSchema);
+      const tentativeAssignment = await createTentativeAssignmentFromInput(
         scenarioId,
-        consultantId: body.consultant_id,
-        role: body.role,
-        startDate: new Date(body.start_date),
-        endDate: new Date(body.end_date),
-        allocationPercentage: body.allocation_percentage ?? 100,
-      },
-    });
+        input
+      );
 
-    return Response.json(toTentativeAssignmentDTO(tentativeAssignment), {
-      status: 201,
-    });
+      return Response.json(tentativeAssignment, { status: 201 });
+    } catch (error) {
+      return createErrorResponse(error);
+    }
   }
 );

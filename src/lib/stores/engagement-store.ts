@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { parseISO } from 'date-fns';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import { normalizeEngagementStatus, type Engagement } from '../types';
 import { datesOverlap } from '../utils/date-helpers';
 
@@ -37,9 +37,13 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
 
   fetchEngagements: async () => {
     set({ loading: true });
-    const res = await authFetch('/api/engagements');
-    const data = await res.json();
-    set({ engagements: data, loading: false });
+    try {
+      const data = await authFetchJson<Engagement[]>('/api/engagements');
+      set({ engagements: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   getById: (id) => get().engagements.find((e) => e.id === id),
@@ -57,69 +61,30 @@ export const useEngagementStore = create<EngagementStore>((set, get) => ({
     ),
 
   addEngagement: async (data) => {
-    try {
-      const res = await authFetch('/api/engagements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        set((s) => ({ engagements: [...s.engagements, created] }));
-        return created;
-      }
-    } catch {
-      // API unavailable — fall through to local-only creation
-    }
-    // Fallback: add to local store without DB persistence
-    const local: Engagement = {
-      ...data,
-      id: crypto.randomUUID(),
-      status: normalizeEngagementStatus(data.status),
-    };
-    set((s) => ({ engagements: [...s.engagements, local] }));
-    return local;
+    const created = await authFetchJson<Engagement>('/api/engagements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    set((s) => ({ engagements: [...s.engagements, created] }));
+    return created;
   },
 
   updateEngagement: async (id, data) => {
-    try {
-      const res = await authFetch(`/api/engagements/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        set((s) => ({
-          engagements: s.engagements.map((e) => (e.id === id ? updated : e)),
-        }));
-        return;
-      }
-    } catch {
-      // API unavailable — fall through to local-only update
-    }
+    const updated = await authFetchJson<Engagement>(`/api/engagements/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
     set((s) => ({
-      engagements: s.engagements.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              ...data,
-              status:
-                data.status !== undefined
-                  ? normalizeEngagementStatus(data.status)
-                  : e.status,
-            } as Engagement
-          : e
-      ),
+      engagements: s.engagements.map((e) => (e.id === id ? updated : e)),
     }));
   },
 
   removeEngagement: async (id) => {
-    try {
-      await authFetch(`/api/engagements/${id}`, { method: 'DELETE' });
-    } catch {
-      // API unavailable — still remove locally
-    }
+    await authFetchJson<{ success: boolean }>(`/api/engagements/${id}`, {
+      method: 'DELETE',
+    });
     set((s) => ({
       engagements: s.engagements.filter((e) => e.id !== id),
     }));

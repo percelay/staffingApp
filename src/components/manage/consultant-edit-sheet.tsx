@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CONSULTING_SKILLS } from '@/lib/constants/staffing';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
@@ -23,14 +24,6 @@ import {
   type SeniorityLevel,
   type PracticeArea,
 } from '@/lib/types/consultant';
-
-const ALL_SKILLS = [
-  'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
-  'Process Optimization', 'Digital Strategy', 'Stakeholder Management', 'Market Analysis',
-  'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
-  'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
-  'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
 
 function seniorityToRole(seniority: SeniorityLevel): string {
   return SENIORITY_LABELS[seniority] || 'Consultant';
@@ -151,9 +144,9 @@ export function ConsultantEditSheet({ consultant, open, onOpenChange }: Consulta
     );
   };
 
-  const availableSkills = ALL_SKILLS.filter((s) => !skills.includes(s));
+  const availableSkills = CONSULTING_SKILLS.filter((s) => !skills.includes(s));
   // Goals can only be skills the consultant doesn't already have
-  const availableGoalSkills = ALL_SKILLS.filter((s) => !skills.includes(s) && !goals.includes(s));
+  const availableGoalSkills = CONSULTING_SKILLS.filter((s) => !skills.includes(s) && !goals.includes(s));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

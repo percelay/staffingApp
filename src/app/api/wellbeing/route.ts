@@ -1,6 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toWellbeingDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { wellbeingSignalCreateSchema } from '@/server/schemas/staffing';
+import {
+  createWellbeingSignalFromInput,
+  getWellbeingSignals,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,17 +16,8 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth('wellbeing', async (request) => {
   const { searchParams } = new URL(request.url);
   const consultantId = searchParams.get('consultantId');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
-  if (consultantId) where.consultantId = consultantId;
-
-  const signals = await prisma.wellbeingSignal.findMany({
-    where,
-    orderBy: { recordedAt: 'desc' },
-  });
-
-  return Response.json(signals.map(toWellbeingDTO));
+  const signals = await getWellbeingSignals({ consultantId });
+  return Response.json(signals);
 });
 
 /**
@@ -31,17 +26,11 @@ export const GET = withAuth('wellbeing', async (request) => {
  * Body: { consultant_id, signal_type, severity, recorded_at?, notes? }
  */
 export const POST = withAuth('wellbeing', async (request) => {
-  const body = await request.json();
-
-  const signal = await prisma.wellbeingSignal.create({
-    data: {
-      consultantId: body.consultant_id,
-      signalType: body.signal_type,
-      severity: body.severity,
-      recordedAt: body.recorded_at ? new Date(body.recorded_at) : new Date(),
-      notes: body.notes || null,
-    },
-  });
-
-  return Response.json(toWellbeingDTO(signal), { status: 201 });
+  try {
+    const input = await parseRequestBody(request, wellbeingSignalCreateSchema);
+    const signal = await createWellbeingSignalFromInput(input);
+    return Response.json(signal, { status: 201 });
+  } catch (error) {
+    return createErrorResponse(error);
+  }
 });

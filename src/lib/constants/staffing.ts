@@ -1,0 +1,46 @@
+export const CONSULTING_SKILLS = [
+  'Financial Modeling',
+  'Change Management',
+  'Data Analytics',
+  'Due Diligence',
+  'Process Optimization',
+  'Digital Strategy',
+  'Stakeholder Management',
+  'Market Analysis',
+  'Risk Assessment',
+  'Supply Chain',
+  'M&A Integration',
+  'Cost Reduction',
+  'Agile Transformation',
+  'Cloud Migration',
+  'People Analytics',
+  'Regulatory Compliance',
+  'Revenue Growth',
+  'Customer Experience',
+  'Organizational Design',
+  'Performance Management',
+] as const;
+
+export const ENGAGEMENT_COLOR_PALETTE = [
+  '#4F46E5',
+  '#0891B2',
+  '#059669',
+  '#D97706',
+  '#DC2626',
+  '#7C3AED',
+  '#DB2777',
+  '#2563EB',
+] as const;
+
+export const OPPORTUNITY_COLOR_PALETTE = [
+  '#6366F1',
+  '#0891B2',
+  '#059669',
+  '#D97706',
+  '#DC2626',
+  '#7C3AED',
+  '#DB2777',
+  '#2563EB',
+  '#EA580C',
+  '#65A30D',
+] as const;

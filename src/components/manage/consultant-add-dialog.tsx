@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CONSULTING_SKILLS } from '@/lib/constants/staffing';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import {
   SENIORITY_LABELS,
@@ -20,14 +21,6 @@ import {
   type SeniorityLevel,
   type PracticeArea,
 } from '@/lib/types/consultant';
-
-const ALL_SKILLS = [
-  'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
-  'Process Optimization', 'Digital Strategy', 'Stakeholder Management', 'Market Analysis',
-  'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
-  'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
-  'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
 
 interface ConsultantAddDialogProps {
   open: boolean;
@@ -54,6 +47,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
         practice_area: practiceArea,
         skills,
         goals,
+        status: 'active',
         avatar_url: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name.trim())}`,
       });
       // Reset form
@@ -84,7 +78,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
     );
   };
 
-  const availableGoalSkills = ALL_SKILLS.filter((s) => !skills.includes(s));
+  const availableGoalSkills = CONSULTING_SKILLS.filter((s) => !skills.includes(s));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,7 +138,7 @@ export function ConsultantAddDialog({ open, onOpenChange }: ConsultantAddDialogP
           <div className="space-y-2">
             <Label>Skills ({skills.length} selected)</Label>
             <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border rounded-md p-3">
-              {ALL_SKILLS.map((skill) => (
+              {CONSULTING_SKILLS.map((skill) => (
                 <Badge
                   key={skill}
                   variant={skills.includes(skill) ? 'default' : 'outline'}

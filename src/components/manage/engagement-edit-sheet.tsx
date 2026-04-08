@@ -8,6 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  CONSULTING_SKILLS,
+  ENGAGEMENT_COLOR_PALETTE,
+} from '@/lib/constants/staffing';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
@@ -17,20 +21,6 @@ import {
   type EngagementStatus,
 } from '@/lib/types/engagement';
 import type { AssignmentRole } from '@/lib/types/assignment';
-
-const ALL_SKILLS = [
-  'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
-  'Process Optimization', 'Digital Strategy', 'Stakeholder Management', 'Market Analysis',
-  'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
-  'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
-  'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
-
-const COLOR_OPTIONS = [
-  '#4F46E5', '#0891B2', '#059669', '#D97706',
-  '#DC2626', '#7C3AED', '#DB2777', '#2563EB',
-  '#EA580C', '#65A30D',
-];
 
 interface EngagementEditSheetProps {
   engagement: Engagement | null;
@@ -52,7 +42,7 @@ export function EngagementEditSheet({ engagement, open, onOpenChange }: Engageme
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState<EngagementStatus>('active');
-  const [color, setColor] = useState('#4F46E5');
+  const [color, setColor] = useState<string>(ENGAGEMENT_COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -211,7 +201,7 @@ export function EngagementEditSheet({ engagement, open, onOpenChange }: Engageme
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex gap-1.5 flex-wrap">
-                {COLOR_OPTIONS.map((c) => (
+                {ENGAGEMENT_COLOR_PALETTE.map((c) => (
                   <button
                     key={c}
                     className={`w-7 h-7 rounded-md border-2 transition-all ${
@@ -231,7 +221,7 @@ export function EngagementEditSheet({ engagement, open, onOpenChange }: Engageme
           <div className="space-y-2">
             <Label>Required Skills ({requiredSkills.length})</Label>
             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-              {ALL_SKILLS.map((skill) => (
+              {CONSULTING_SKILLS.map((skill) => (
                 <Badge
                   key={skill}
                   variant={requiredSkills.includes(skill) ? 'default' : 'outline'}

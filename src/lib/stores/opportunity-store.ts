@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import {
   ACTIVE_PIPELINE_STAGES,
   normalizePipelineStage,
@@ -59,6 +59,21 @@ interface OpportunityStore {
   ) => Promise<void>;
 }
 
+function normalizeOpportunity(opportunity: Opportunity): Opportunity {
+  return {
+    ...opportunity,
+    stage: normalizePipelineStage(opportunity.stage),
+    required_skills: opportunity.required_skills ?? [],
+  };
+}
+
+function normalizeScenario(scenario: Scenario): Scenario {
+  return {
+    ...scenario,
+    tentative_assignments: scenario.tentative_assignments ?? [],
+  };
+}
+
 function mergeScenarios(
   existing: Scenario[],
   opportunityId: string,
@@ -66,37 +81,8 @@ function mergeScenarios(
 ) {
   return [
     ...existing.filter((scenario) => scenario.opportunity_id !== opportunityId),
-    ...incoming,
+    ...incoming.map(normalizeScenario),
   ];
-}
-
-function buildLocalDefaultScenario(
-  opportunityId: string,
-  defaultScenario: OpportunityCreateInput['default_scenario'],
-  startDate: string,
-  endDate: string
-): Scenario {
-  const scenarioId = crypto.randomUUID();
-
-  return {
-    id: scenarioId,
-    opportunity_id: opportunityId,
-    name: defaultScenario?.name?.trim() || 'Primary Team',
-    is_default: true,
-    fit_score: null,
-    burnout_impact: null,
-    tentative_assignments: (defaultScenario?.tentative_assignments ?? []).map(
-      (assignment) => ({
-        id: crypto.randomUUID(),
-        scenario_id: scenarioId,
-        consultant_id: assignment.consultant_id,
-        role: assignment.role,
-        start_date: assignment.start_date || startDate,
-        end_date: assignment.end_date || endDate,
-        allocation_percentage: assignment.allocation_percentage ?? 100,
-      })
-    ),
-  };
 }
 
 export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
@@ -107,67 +93,37 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
   scenarios: [],
 
   setOpportunities: (opportunities) =>
-    set({
-      opportunities: opportunities.map((opportunity) => ({
-        ...opportunity,
-        stage: normalizePipelineStage(opportunity.stage),
-        required_skills: opportunity.required_skills ?? [],
-      })),
-    }),
+    set({ opportunities: opportunities.map(normalizeOpportunity) }),
 
   setScenarios: (scenarios) =>
-    set({
-      scenarios: scenarios.map((scenario) => ({
-        ...scenario,
-        tentative_assignments: scenario.tentative_assignments ?? [],
-      })),
-    }),
+    set({ scenarios: scenarios.map(normalizeScenario) }),
 
   fetchOpportunities: async () => {
     set({ loading: true });
     try {
-      const res = await authFetch('/api/opportunities');
-      if (res.ok) {
-        const data = await res.json();
-        set({
-          opportunities: data.map((opportunity: Opportunity) => ({
-            ...opportunity,
-            stage: normalizePipelineStage(opportunity.stage),
-          })),
-          loading: false,
-        });
-        return;
-      }
-    } catch {
-      // Keep current state if API is unavailable
+      const opportunities = await authFetchJson<Opportunity[]>('/api/opportunities');
+      set({
+        opportunities: opportunities.map(normalizeOpportunity),
+        loading: false,
+      });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
     }
-    set({ loading: false });
   },
 
   fetchAllScenarios: async () => {
-    try {
-      const res = await authFetch('/api/opportunities/scenarios');
-      if (res.ok) {
-        const data = await res.json();
-        set({ scenarios: data });
-      }
-    } catch {
-      // Keep current scenarios if API is unavailable
-    }
+    const scenarios = await authFetchJson<Scenario[]>('/api/opportunities/scenarios');
+    set({ scenarios: scenarios.map(normalizeScenario) });
   },
 
   fetchScenarios: async (opportunityId) => {
-    try {
-      const res = await authFetch(`/api/opportunities/${opportunityId}/scenarios`);
-      if (res.ok) {
-        const data = await res.json();
-        set((state) => ({
-          scenarios: mergeScenarios(state.scenarios, opportunityId, data),
-        }));
-      }
-    } catch {
-      // Keep current scenarios if API is unavailable
-    }
+    const scenarios = await authFetchJson<Scenario[]>(
+      `/api/opportunities/${opportunityId}/scenarios`
+    );
+    set((state) => ({
+      scenarios: mergeScenarios(state.scenarios, opportunityId, scenarios),
+    }));
   },
 
   getById: (id) => get().opportunities.find((opportunity) => opportunity.id === id),
@@ -187,247 +143,127 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
   setActiveScenarioId: (id) => set({ activeScenarioId: id }),
 
   addOpportunity: async (data) => {
-    try {
-      const res = await authFetch('/api/opportunities', {
+    const created = normalizeOpportunity(
+      await authFetchJson<Opportunity>('/api/opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        set((state) => ({
-          opportunities: [...state.opportunities, created],
-        }));
-        await get().fetchScenarios(created.id);
-        return created;
-      }
-    } catch {
-      // Fall through to local-only creation
-    }
-
-    const { default_scenario, ...opportunityData } = data;
-    const localOpportunity: Opportunity = {
-      ...opportunityData,
-      id: crypto.randomUUID(),
-      stage: normalizePipelineStage(data.stage),
-      is_bet: data.is_bet ?? false,
-      notes: data.notes ?? null,
-      estimated_value: data.estimated_value ?? null,
-      converted_engagement_id: data.converted_engagement_id ?? null,
-    };
-    const localScenario = buildLocalDefaultScenario(
-      localOpportunity.id,
-      default_scenario,
-      localOpportunity.start_date,
-      localOpportunity.end_date
+      })
     );
 
     set((state) => ({
-      opportunities: [...state.opportunities, localOpportunity],
-      scenarios: [...state.scenarios, localScenario],
+      opportunities: [...state.opportunities, created],
     }));
 
-    return localOpportunity;
+    await get().fetchScenarios(created.id);
+    return created;
   },
 
   updateOpportunity: async (id, data) => {
-    try {
-      const res = await authFetch(`/api/opportunities/${id}`, {
+    const updated = normalizeOpportunity(
+      await authFetchJson<Opportunity>(`/api/opportunities/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        set((state) => ({
-          opportunities: state.opportunities.map((opportunity) =>
-            opportunity.id === id ? updated : opportunity
-          ),
-        }));
-        if (data.default_scenario !== undefined) {
-          await get().fetchScenarios(id);
-        }
-        return;
-      }
-    } catch {
-      // Fall through to local-only update
+      })
+    );
+
+    set((state) => ({
+      opportunities: state.opportunities.map((opportunity) =>
+        opportunity.id === id ? updated : opportunity
+      ),
+    }));
+
+    if (data.default_scenario !== undefined) {
+      await get().fetchScenarios(id);
     }
+  },
+
+  removeOpportunity: async (id) => {
+    await authFetchJson<{ success: boolean }>(`/api/opportunities/${id}`, {
+      method: 'DELETE',
+    });
 
     set((state) => {
-      const opportunityData = { ...data };
-      delete opportunityData.default_scenario;
-      const opportunities = state.opportunities.map((opportunity) =>
-        opportunity.id === id
-          ? ({
-              ...opportunity,
-              ...opportunityData,
-              stage:
-                data.stage !== undefined
-                  ? normalizePipelineStage(data.stage)
-                  : opportunity.stage,
-            } as Opportunity)
-          : opportunity
+      const nextScenarios = state.scenarios.filter(
+        (scenario) => scenario.opportunity_id !== id
       );
 
-      if (data.default_scenario === undefined) {
-        return { opportunities };
-      }
-
-      const existingDefaultScenario =
-        state.scenarios.find(
-          (scenario) => scenario.opportunity_id === id && scenario.is_default
-        ) ??
-        null;
-      const baseOpportunity =
-        opportunities.find((opportunity) => opportunity.id === id) ??
-        state.opportunities.find((opportunity) => opportunity.id === id);
-
-      if (!baseOpportunity) {
-        return { opportunities };
-      }
-
-      const nextScenarioId = existingDefaultScenario?.id ?? crypto.randomUUID();
-
-      const nextScenario: Scenario = {
-        id: nextScenarioId,
-        opportunity_id: id,
-        name: data.default_scenario?.name?.trim() || existingDefaultScenario?.name || 'Primary Team',
-        is_default: true,
-        fit_score: existingDefaultScenario?.fit_score ?? null,
-        burnout_impact: existingDefaultScenario?.burnout_impact ?? null,
-        tentative_assignments: (
-          data.default_scenario?.tentative_assignments ?? []
-        ).map((assignment) => ({
-          id: crypto.randomUUID(),
-          scenario_id: nextScenarioId,
-          consultant_id: assignment.consultant_id,
-          role: assignment.role,
-          start_date: assignment.start_date || baseOpportunity.start_date,
-          end_date: assignment.end_date || baseOpportunity.end_date,
-          allocation_percentage: assignment.allocation_percentage ?? 100,
-        })),
-      };
-
       return {
-        opportunities,
-        scenarios: [
-          ...state.scenarios.filter(
-            (scenario) => scenario.id !== existingDefaultScenario?.id
-          ),
-          nextScenario,
-        ],
+        opportunities: state.opportunities.filter(
+          (opportunity) => opportunity.id !== id
+        ),
+        scenarios: nextScenarios,
+        selectedOpportunityId:
+          state.selectedOpportunityId === id ? null : state.selectedOpportunityId,
+        activeScenarioId: nextScenarios.some(
+          (scenario) => scenario.id === state.activeScenarioId
+        )
+          ? state.activeScenarioId
+          : null,
       };
     });
   },
 
-  removeOpportunity: async (id) => {
-    try {
-      await authFetch(`/api/opportunities/${id}`, { method: 'DELETE' });
-    } catch {
-      // Still remove locally
-    }
-    set((state) => ({
-      opportunities: state.opportunities.filter((opportunity) => opportunity.id !== id),
-      scenarios: state.scenarios.filter((scenario) => scenario.opportunity_id !== id),
-      selectedOpportunityId:
-        state.selectedOpportunityId === id ? null : state.selectedOpportunityId,
-      activeScenarioId:
-        state.scenarios.some(
-          (scenario) =>
-            scenario.opportunity_id === id && scenario.id === state.activeScenarioId
-        )
-          ? null
-          : state.activeScenarioId,
-    }));
-  },
-
   addScenario: async (opportunityId, data) => {
-    try {
-      const res = await authFetch(`/api/opportunities/${opportunityId}/scenarios`, {
+    const created = normalizeScenario(
+      await authFetchJson<Scenario>(`/api/opportunities/${opportunityId}/scenarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        set((state) => ({ scenarios: [...state.scenarios, created] }));
-        return created;
-      }
-    } catch {
-      // Fall through to local-only creation
-    }
+      })
+    );
 
-    const localScenario: Scenario = {
-      id: crypto.randomUUID(),
-      opportunity_id: opportunityId,
-      name: data.name,
-      is_default: data.is_default ?? false,
-      fit_score: null,
-      burnout_impact: null,
-      tentative_assignments: [],
-    };
-    set((state) => ({ scenarios: [...state.scenarios, localScenario] }));
-    return localScenario;
+    set((state) => ({ scenarios: [...state.scenarios, created] }));
+    return created;
   },
 
   updateScenario: async (scenarioId, data) => {
     const scenario = get().scenarios.find((candidate) => candidate.id === scenarioId);
     if (!scenario) {
-      return;
+      throw new Error('Scenario not found');
     }
 
-    try {
-      const res = await authFetch(
+    const updated = normalizeScenario(
+      await authFetchJson<Scenario>(
         `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: data.name,
-            is_default: data.is_default,
-            fit_score: data.fit_score,
-            burnout_impact: data.burnout_impact,
-          }),
+          body: JSON.stringify(data),
         }
-      );
-      if (res.ok) {
-        const updated = await res.json();
-        set((state) => ({
-          scenarios: state.scenarios.map((candidate) =>
-            candidate.id === scenarioId ? updated : candidate
-          ),
-        }));
-        return;
-      }
-    } catch {
-      // Fall through to local-only update
-    }
+      )
+    );
 
     set((state) => ({
       scenarios: state.scenarios.map((candidate) =>
-        candidate.id === scenarioId ? { ...candidate, ...data } : candidate
+        candidate.id === scenarioId ? updated : candidate
       ),
     }));
   },
 
   removeScenario: async (scenarioId) => {
     const scenario = get().scenarios.find((candidate) => candidate.id === scenarioId);
-    try {
-      if (scenario) {
-        await authFetch(
-          `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}`,
-          { method: 'DELETE' }
-        );
-      }
-    } catch {
-      // Still remove locally
+    if (!scenario) {
+      throw new Error('Scenario not found');
     }
 
-    set((state) => ({
-      scenarios: state.scenarios.filter((candidate) => candidate.id !== scenarioId),
-      activeScenarioId:
-        state.activeScenarioId === scenarioId ? null : state.activeScenarioId,
-    }));
+    await authFetchJson<{ success: boolean }>(
+      `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}`,
+      { method: 'DELETE' }
+    );
+
+    set((state) => {
+      const nextScenarios = state.scenarios.filter(
+        (candidate) => candidate.id !== scenarioId
+      );
+
+      return {
+        scenarios: nextScenarios,
+        activeScenarioId:
+          state.activeScenarioId === scenarioId ? null : state.activeScenarioId,
+      };
+    });
   },
 
   addTentativeAssignment: async (scenarioId, data) => {
@@ -436,41 +272,15 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
       throw new Error(`Scenario ${scenarioId} not found`);
     }
 
-    try {
-      const res = await authFetch(
-        `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        }
-      );
-      if (res.ok) {
-        const created = await res.json();
-        set((state) => ({
-          scenarios: state.scenarios.map((candidate) =>
-            candidate.id === scenarioId
-              ? {
-                  ...candidate,
-                  tentative_assignments: [
-                    ...candidate.tentative_assignments,
-                    created,
-                  ],
-                }
-              : candidate
-          ),
-        }));
-        return created;
+    const created = await authFetchJson<TentativeAssignment>(
+      `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       }
-    } catch {
-      // Fall through to local-only update
-    }
+    );
 
-    const localAssignment: TentativeAssignment = {
-      id: crypto.randomUUID(),
-      scenario_id: scenarioId,
-      ...data,
-    };
     set((state) => ({
       scenarios: state.scenarios.map((candidate) =>
         candidate.id === scenarioId
@@ -478,27 +288,26 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
               ...candidate,
               tentative_assignments: [
                 ...candidate.tentative_assignments,
-                localAssignment,
+                created,
               ],
             }
           : candidate
       ),
     }));
-    return localAssignment;
+
+    return created;
   },
 
   removeTentativeAssignment: async (scenarioId, assignmentId) => {
     const scenario = get().scenarios.find((candidate) => candidate.id === scenarioId);
-    try {
-      if (scenario) {
-        await authFetch(
-          `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments/${assignmentId}`,
-          { method: 'DELETE' }
-        );
-      }
-    } catch {
-      // Still remove locally
+    if (!scenario) {
+      throw new Error(`Scenario ${scenarioId} not found`);
     }
+
+    await authFetchJson<{ success: boolean }>(
+      `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments/${assignmentId}`,
+      { method: 'DELETE' }
+    );
 
     set((state) => ({
       scenarios: state.scenarios.map((candidate) =>
@@ -516,37 +325,18 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
 
   updateTentativeAssignment: async (scenarioId, assignmentId, data) => {
     const scenario = get().scenarios.find((candidate) => candidate.id === scenarioId);
-    try {
-      if (scenario) {
-        const res = await authFetch(
-          `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments/${assignmentId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          }
-        );
-        if (res.ok) {
-          const updated = await res.json();
-          set((state) => ({
-            scenarios: state.scenarios.map((candidate) =>
-              candidate.id === scenarioId
-                ? {
-                    ...candidate,
-                    tentative_assignments: candidate.tentative_assignments.map(
-                      (assignment) =>
-                        assignment.id === assignmentId ? updated : assignment
-                    ),
-                  }
-                : candidate
-            ),
-          }));
-          return;
-        }
-      }
-    } catch {
-      // Fall through to local-only update
+    if (!scenario) {
+      throw new Error(`Scenario ${scenarioId} not found`);
     }
+
+    const updated = await authFetchJson<TentativeAssignment>(
+      `/api/opportunities/${scenario.opportunity_id}/scenarios/${scenarioId}/assignments/${assignmentId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }
+    );
 
     set((state) => ({
       scenarios: state.scenarios.map((candidate) =>
@@ -555,9 +345,7 @@ export const useOpportunityStore = create<OpportunityStore>((set, get) => ({
               ...candidate,
               tentative_assignments: candidate.tentative_assignments.map(
                 (assignment) =>
-                  assignment.id === assignmentId
-                    ? { ...assignment, ...data }
-                    : assignment
+                  assignment.id === assignmentId ? updated : assignment
               ),
             }
           : candidate

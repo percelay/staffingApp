@@ -22,11 +22,22 @@ export interface AuthContext {
 
 // ─── Permission Definitions ───────────────────────────────────────────────
 
-type Resource = 'consultants' | 'engagements' | 'assignments' | 'proposals' | 'wellbeing' | 'skills' | 'seed' | 'executive_summary' | 'opportunities';
+type Resource =
+  | 'bootstrap'
+  | 'consultants'
+  | 'engagements'
+  | 'assignments'
+  | 'proposals'
+  | 'wellbeing'
+  | 'skills'
+  | 'seed'
+  | 'executive_summary'
+  | 'opportunities';
 type Action = 'read' | 'create' | 'update' | 'delete';
 
 const PERMISSIONS: Record<Role, Record<Resource, Action[]>> = {
   partner: {
+    bootstrap: ['read'],
     consultants: ['read', 'create', 'update', 'delete'],
     engagements: ['read', 'create', 'update', 'delete'],
     assignments: ['read', 'create', 'update', 'delete'],
@@ -38,6 +49,7 @@ const PERMISSIONS: Record<Role, Record<Resource, Action[]>> = {
     opportunities: ['read', 'create', 'update', 'delete'],
   },
   manager: {
+    bootstrap: ['read'],
     consultants: ['read', 'update'],
     engagements: ['read', 'update'],
     assignments: ['read', 'create', 'update', 'delete'],
@@ -88,11 +100,11 @@ export function hasPermission(role: Role, resource: Resource, action: Action): b
  *     return Response.json({ ... });
  *   });
  */
-export function withAuth<T extends unknown[]>(
+export function withAuth<R extends Request, T extends unknown[]>(
   resource: Resource,
-  handler: (request: Request, auth: AuthContext, ...args: T) => Promise<Response>,
+  handler: (request: R, auth: AuthContext, ...args: T) => Promise<Response>,
 ) {
-  return async (request: Request, ...args: T): Promise<Response> => {
+  return async (request: R, ...args: T): Promise<Response> => {
     const auth = extractAuth(request);
 
     if (!auth) {

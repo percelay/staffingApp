@@ -1,7 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toEngagementDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
-import { normalizeEngagementStatus } from '@/lib/types/engagement';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { engagementCreateSchema } from '@/server/schemas/staffing';
+import {
+  createEngagementFromInput,
+  getEngagements,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,20 +16,8 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth('engagements', async (request) => {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
-  if (status) where.status = normalizeEngagementStatus(status);
-
-  const engagements = await prisma.engagement.findMany({
-    where,
-    include: {
-      requiredSkills: { include: { skill: true } },
-    },
-    orderBy: { startDate: 'asc' },
-  });
-
-  return Response.json(engagements.map(toEngagementDTO));
+  const engagements = await getEngagements({ status });
+  return Response.json(engagements);
 });
 
 /**
@@ -35,33 +26,11 @@ export const GET = withAuth('engagements', async (request) => {
  * Body: { client_name, project_name, start_date, end_date, status, color, required_skills: string[] }
  */
 export const POST = withAuth('engagements', async (request) => {
-  const body = await request.json();
-  const { required_skills, ...rest } = body;
-
-  const engagement = await prisma.engagement.create({
-    data: {
-      clientName: rest.client_name,
-      projectName: rest.project_name,
-      startDate: new Date(rest.start_date),
-      endDate: new Date(rest.end_date),
-      status: rest.status ? normalizeEngagementStatus(rest.status) : 'upcoming',
-      color: rest.color || '#4F46E5',
-      isBet: rest.is_bet ?? false,
-      requiredSkills: {
-        create: (required_skills || []).map((skillName: string) => ({
-          skill: {
-            connectOrCreate: {
-              where: { name: skillName },
-              create: { name: skillName },
-            },
-          },
-        })),
-      },
-    },
-    include: {
-      requiredSkills: { include: { skill: true } },
-    },
-  });
-
-  return Response.json(toEngagementDTO(engagement), { status: 201 });
+  try {
+    const input = await parseRequestBody(request, engagementCreateSchema);
+    const engagement = await createEngagementFromInput(input);
+    return Response.json(engagement, { status: 201 });
+  } catch (error) {
+    return createErrorResponse(error);
+  }
 });

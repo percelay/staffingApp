@@ -4,32 +4,10 @@ import type { Consultant, PracticeArea, SeniorityLevel } from '../types/consulta
 import type { Engagement } from '../types/engagement';
 import type { Assignment, AssignmentRole } from '../types/assignment';
 import type { WellbeingSignal } from '../types/wellbeing';
+import { CONSULTING_SKILLS } from '../constants/staffing';
 import { CLIENT_COLORS } from '../utils/colors';
 
 faker.seed(42);
-
-const CONSULTING_SKILLS = [
-  'Financial Modeling',
-  'Change Management',
-  'Data Analytics',
-  'Due Diligence',
-  'Process Optimization',
-  'Digital Strategy',
-  'Stakeholder Management',
-  'Market Analysis',
-  'Risk Assessment',
-  'Supply Chain',
-  'M&A Integration',
-  'Cost Reduction',
-  'Agile Transformation',
-  'Cloud Migration',
-  'People Analytics',
-  'Regulatory Compliance',
-  'Revenue Growth',
-  'Customer Experience',
-  'Organizational Design',
-  'Performance Management',
-];
 
 const PRACTICE_AREAS: PracticeArea[] = ['strategy', 'operations', 'digital', 'risk', 'people'];
 
@@ -74,6 +52,7 @@ function generateConsultants(): Consultant[] {
             seniority === 'consultant' ? 'Consultant' : 'Analyst',
       practice_area: practiceArea,
       seniority_level: seniority,
+      status: 'active',
       skills,
       goals,
       avatar_url: `https://api.dicebear.com/9.x/notionists/svg?seed=${faker.string.alphanumeric(8)}`,

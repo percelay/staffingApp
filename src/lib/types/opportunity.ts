@@ -1,12 +1,14 @@
 import type { AssignmentRole } from './assignment';
+export const PIPELINE_STAGE_VALUES = [
+  'identified',
+  'qualifying',
+  'proposal_sent',
+  'verbal_commit',
+  'won',
+  'lost',
+] as const;
 
-export type PipelineStage =
-  | 'identified'
-  | 'qualifying'
-  | 'proposal_sent'
-  | 'verbal_commit'
-  | 'won'
-  | 'lost';
+export type PipelineStage = (typeof PIPELINE_STAGE_VALUES)[number];
 
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   identified: 'Identified',
@@ -46,15 +48,7 @@ export const ACTIVE_PIPELINE_STAGES: PipelineStage[] = [
 export function normalizePipelineStage(
   stage: string | null | undefined
 ): PipelineStage {
-  const valid: PipelineStage[] = [
-    'identified',
-    'qualifying',
-    'proposal_sent',
-    'verbal_commit',
-    'won',
-    'lost',
-  ];
-  if (stage && valid.includes(stage as PipelineStage)) {
+  if (stage && PIPELINE_STAGE_VALUES.includes(stage as PipelineStage)) {
     return stage as PipelineStage;
   }
   return 'identified';

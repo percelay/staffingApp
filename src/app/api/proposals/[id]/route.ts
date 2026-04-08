@@ -1,34 +1,27 @@
-import { prisma } from '@/lib/db';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { getProposal } from '@/server/services/staffing-service';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/proposals/:id
  * Returns a single proposal with slots.
  */
-export const GET = withAuth('proposals', async (request) => {
-  const id = request.url.split('/api/proposals/')[1]?.split('/')[0]?.split('?')[0];
+export const GET = withAuth(
+  'proposals',
+  async (
+    _request: NextRequest,
+    _auth,
+    ctx: RouteContext<'/api/proposals/[id]'>
+  ) => {
+    const { id } = await ctx.params;
+    const proposal = await getProposal(id);
 
-  const proposal = await prisma.proposal.findUnique({
-    where: { id },
-    include: {
-      slots: { orderBy: { sortOrder: 'asc' } },
-    },
-  });
+    if (!proposal) {
+      return Response.json({ error: 'Proposal not found' }, { status: 404 });
+    }
 
-  if (!proposal) {
-    return Response.json({ error: 'Proposal not found' }, { status: 404 });
+    return Response.json(proposal);
   }
-
-  return Response.json({
-    id: proposal.id,
-    engagement_id: proposal.engagementId,
-    fit_score: proposal.fitScore,
-    burnout_risk: proposal.burnoutRisk,
-    created_at: proposal.createdAt.toISOString(),
-    slots: proposal.slots.map((s) => ({
-      role: s.role,
-      consultant_id: s.consultantId,
-      required: s.required,
-    })),
-  });
-});
+);

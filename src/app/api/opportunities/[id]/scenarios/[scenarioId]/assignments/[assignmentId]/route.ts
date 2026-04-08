@@ -1,6 +1,11 @@
-import { prisma } from '@/lib/db';
-import { toTentativeAssignmentDTO } from '@/lib/api/transformers';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { tentativeAssignmentUpdateSchema } from '@/server/schemas/staffing';
+import {
+  deleteTentativeAssignmentById,
+  updateTentativeAssignmentFromInput,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,35 +15,22 @@ export const dynamic = 'force-dynamic';
 export const PATCH = withAuth(
   'opportunities',
   async (
-    request,
+    request: NextRequest,
     _auth,
-    context: {
-      params: Promise<{
-        id: string;
-        scenarioId: string;
-        assignmentId: string;
-      }>;
-    }
+    ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments/[assignmentId]'>
   ) => {
-    const { assignmentId } = await context.params;
-    const body = await request.json();
+    try {
+      const { assignmentId } = await ctx.params;
+      const input = await parseRequestBody(request, tentativeAssignmentUpdateSchema);
+      const tentativeAssignment = await updateTentativeAssignmentFromInput(
+        assignmentId,
+        input
+      );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = {};
-    if (body.consultant_id !== undefined) data.consultantId = body.consultant_id;
-    if (body.role !== undefined) data.role = body.role;
-    if (body.start_date !== undefined) data.startDate = new Date(body.start_date);
-    if (body.end_date !== undefined) data.endDate = new Date(body.end_date);
-    if (body.allocation_percentage !== undefined) {
-      data.allocationPercentage = body.allocation_percentage;
+      return Response.json(tentativeAssignment);
+    } catch (error) {
+      return createErrorResponse(error);
     }
-
-    const tentativeAssignment = await prisma.tentativeAssignment.update({
-      where: { id: assignmentId },
-      data,
-    });
-
-    return Response.json(toTentativeAssignmentDTO(tentativeAssignment));
   }
 );
 
@@ -48,19 +40,12 @@ export const PATCH = withAuth(
 export const DELETE = withAuth(
   'opportunities',
   async (
-    _request,
+    _request: NextRequest,
     _auth,
-    context: {
-      params: Promise<{
-        id: string;
-        scenarioId: string;
-        assignmentId: string;
-      }>;
-    }
+    ctx: RouteContext<'/api/opportunities/[id]/scenarios/[scenarioId]/assignments/[assignmentId]'>
   ) => {
-    const { assignmentId } = await context.params;
-
-    await prisma.tentativeAssignment.delete({ where: { id: assignmentId } });
+    const { assignmentId } = await ctx.params;
+    await deleteTentativeAssignmentById(assignmentId);
 
     return Response.json({ success: true });
   }

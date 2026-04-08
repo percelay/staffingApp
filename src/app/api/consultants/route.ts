@@ -1,6 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toConsultantDTO } from '@/lib/api/transformers';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { consultantCreateSchema } from '@/server/schemas/staffing';
+import {
+  createConsultantFromInput,
+  getConsultants,
+} from '@/server/services/staffing-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,22 +18,11 @@ export const GET = withAuth('consultants', async (request) => {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status') || 'active';
   const practiceArea = searchParams.get('practiceArea');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = {};
-  if (status !== 'all') where.status = status;
-  if (practiceArea) where.practiceArea = practiceArea;
-
-  const consultants = await prisma.consultant.findMany({
-    where,
-    include: {
-      skills: { include: { skill: true } },
-      goals: { include: { skill: true } },
-    },
-    orderBy: [{ seniorityLevel: 'desc' }, { name: 'asc' }],
+  const consultants = await getConsultants({
+    status: status === 'all' ? 'all' : status,
+    practiceArea,
   });
-
-  return Response.json(consultants.map(toConsultantDTO));
+  return Response.json(consultants);
 });
 
 /**
@@ -38,44 +31,11 @@ export const GET = withAuth('consultants', async (request) => {
  * Body: { name, role, practice_area, seniority_level, skills: string[], avatar_url }
  */
 export const POST = withAuth('consultants', async (request) => {
-  const body = await request.json();
-  const { skills, goals, ...rest } = body;
-
-  // Map snake_case frontend fields to camelCase Prisma fields
-  const consultant = await prisma.consultant.create({
-    data: {
-      name: rest.name,
-      role: rest.role,
-      practiceArea: rest.practice_area,
-      seniorityLevel: rest.seniority_level,
-      avatarUrl: rest.avatar_url || `https://api.dicebear.com/9.x/notionists/svg?seed=${Date.now()}`,
-      status: 'active',
-      skills: {
-        create: (skills || []).map((skillName: string) => ({
-          skill: {
-            connectOrCreate: {
-              where: { name: skillName },
-              create: { name: skillName },
-            },
-          },
-        })),
-      },
-      goals: {
-        create: (goals || []).map((skillName: string) => ({
-          skill: {
-            connectOrCreate: {
-              where: { name: skillName },
-              create: { name: skillName },
-            },
-          },
-        })),
-      },
-    },
-    include: {
-      skills: { include: { skill: true } },
-      goals: { include: { skill: true } },
-    },
-  });
-
-  return Response.json(toConsultantDTO(consultant), { status: 201 });
+  try {
+    const input = await parseRequestBody(request, consultantCreateSchema);
+    const consultant = await createConsultantFromInput(input);
+    return Response.json(consultant, { status: 201 });
+  } catch (error) {
+    return createErrorResponse(error);
+  }
 });

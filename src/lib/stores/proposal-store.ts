@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import type { ProposalSlot, Proposal } from '../types';
 
-const DEFAULT_SLOTS: ProposalSlot[] = [
+export const DEFAULT_PROPOSAL_SLOTS: ProposalSlot[] = [
   { role: 'lead', consultant_id: null, required: true },
   { role: 'manager', consultant_id: null, required: true },
   { role: 'consultant', consultant_id: null, required: true },
@@ -16,6 +16,8 @@ interface ProposalStore {
   savedProposals: Proposal[];
 
   setEngagementId: (id: string | null) => void;
+  setSavedProposals: (proposals: Proposal[]) => void;
+  resetProposalState: () => void;
   addToSlot: (slotIndex: number, consultantId: string) => void;
   removeFromSlot: (slotIndex: number) => void;
   resetSlots: () => void;
@@ -25,11 +27,20 @@ interface ProposalStore {
 
 export const useProposalStore = create<ProposalStore>((set) => ({
   engagementId: null,
-  slots: [...DEFAULT_SLOTS],
+  slots: [...DEFAULT_PROPOSAL_SLOTS],
   savedProposals: [],
 
   setEngagementId: (engagementId) =>
-    set({ engagementId, slots: DEFAULT_SLOTS.map((s) => ({ ...s })) }),
+    set({ engagementId, slots: DEFAULT_PROPOSAL_SLOTS.map((s) => ({ ...s })) }),
+
+  setSavedProposals: (savedProposals) => set({ savedProposals }),
+
+  resetProposalState: () =>
+    set({
+      engagementId: null,
+      slots: DEFAULT_PROPOSAL_SLOTS.map((slot) => ({ ...slot })),
+      savedProposals: [],
+    }),
 
   addToSlot: (slotIndex, consultantId) =>
     set((state) => ({
@@ -46,23 +57,21 @@ export const useProposalStore = create<ProposalStore>((set) => ({
     })),
 
   resetSlots: () =>
-    set({ slots: DEFAULT_SLOTS.map((s) => ({ ...s })) }),
+    set({ slots: DEFAULT_PROPOSAL_SLOTS.map((s) => ({ ...s })) }),
 
   saveProposal: async (proposal) => {
-    const res = await authFetch('/api/proposals', {
+    const saved = await authFetchJson<Proposal>('/api/proposals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(proposal),
     });
-    const saved = await res.json();
     set((state) => ({
       savedProposals: [...state.savedProposals, saved],
     }));
   },
 
   fetchProposals: async () => {
-    const res = await authFetch('/api/proposals');
-    const data = await res.json();
+    const data = await authFetchJson<Proposal[]>('/api/proposals');
     set({ savedProposals: data });
   },
 }));

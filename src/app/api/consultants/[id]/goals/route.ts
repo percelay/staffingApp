@@ -1,6 +1,10 @@
-import { prisma } from '@/lib/db';
-import { toConsultantDTO } from '@/lib/api/transformers';
+import type { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/rbac';
+import { createErrorResponse, parseRequestBody } from '@/server/http';
+import { consultantGoalsSchema } from '@/server/schemas/staffing';
+import { replaceConsultantGoalsFromInput } from '@/server/services/staffing-service';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * PUT /api/consultants/:id/goals
@@ -10,43 +14,25 @@ import { withAuth } from '@/lib/api/rbac';
  * Goals are skills a consultant wants to learn/develop.
  * Each goal maps to an existing Skill record.
  */
-export const PUT = withAuth('consultants', async (request) => {
-  const id = request.url.split('/api/consultants/')[1]?.split('/')[0]?.split('?')[0];
-  const { goals } = await request.json();
+export const PUT = withAuth(
+  'consultants',
+  async (
+    request: NextRequest,
+    _auth,
+    ctx: RouteContext<'/api/consultants/[id]/goals'>
+  ) => {
+    try {
+      const { id } = await ctx.params;
+      const input = await parseRequestBody(request, consultantGoalsSchema);
+      const consultant = await replaceConsultantGoalsFromInput(id, input);
 
-  if (!Array.isArray(goals)) {
-    return Response.json(
-      { error: 'goals must be an array of strings' },
-      { status: 400 }
-    );
-  }
+      if (!consultant) {
+        return Response.json({ error: 'Consultant not found' }, { status: 404 });
+      }
 
-  // Atomic: delete old, create new
-  await prisma.$transaction(async (tx) => {
-    await tx.consultantGoal.deleteMany({
-      where: { consultantId: id },
-    });
-
-    for (const skillName of goals) {
-      const skill = await tx.skill.upsert({
-        where: { name: skillName },
-        update: {},
-        create: { name: skillName },
-      });
-      await tx.consultantGoal.create({
-        data: {
-          consultantId: id,
-          skillId: skill.id,
-        },
-      });
+      return Response.json(consultant);
+    } catch (error) {
+      return createErrorResponse(error);
     }
-  });
-
-  // Return updated consultant
-  const consultant = await prisma.consultant.findUnique({
-    where: { id },
-    include: { skills: { include: { skill: true } }, goals: { include: { skill: true } } },
-  });
-
-  return Response.json(toConsultantDTO(consultant!));
-});
+  }
+);

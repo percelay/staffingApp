@@ -11,6 +11,10 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  CONSULTING_SKILLS,
+  ENGAGEMENT_COLOR_PALETTE,
+} from '@/lib/constants/staffing';
 import { useConsultantStore } from '@/lib/stores/consultant-store';
 import { useEngagementStore } from '@/lib/stores/engagement-store';
 import { useAssignmentStore } from '@/lib/stores/assignment-store';
@@ -35,22 +39,6 @@ import {
   AvailableStaffingConsultantCard,
   getConsultantMatches,
 } from '@/components/staffing/shared/staffing-consultant-picker';
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const ALL_SKILLS = [
-  'Financial Modeling', 'Change Management', 'Data Analytics', 'Due Diligence',
-  'Process Optimization', 'Digital Strategy', 'Stakeholder Management', 'Market Analysis',
-  'Risk Assessment', 'Supply Chain', 'M&A Integration', 'Cost Reduction',
-  'Agile Transformation', 'Cloud Migration', 'People Analytics', 'Regulatory Compliance',
-  'Revenue Growth', 'Customer Experience', 'Organizational Design', 'Performance Management',
-];
-
-const COLOR_PALETTE = [
-  '#4F46E5', '#0891B2', '#059669', '#D97706',
-  '#DC2626', '#7C3AED', '#DB2777', '#2563EB',
-  '#EA580C', '#65A30D',
-];
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -92,8 +80,9 @@ export function StaffingWorkspace() {
     }
     const order: Record<EngagementStatus, number> = {
       active: 0,
-      upcoming: 1,
-      completed: 2,
+      at_risk: 1,
+      upcoming: 2,
+      completed: 3,
     };
     list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
     return list;
@@ -417,7 +406,7 @@ function EngagementDetail({
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Color</Label>
             <div className="flex gap-1.5">
-              {COLOR_PALETTE.map((c) => (
+              {ENGAGEMENT_COLOR_PALETTE.map((c) => (
                 <button key={c} className={`w-7 h-7 rounded-md border-2 transition-all ${color === c ? 'border-foreground scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => setColor(c)} />
               ))}
             </div>
@@ -429,7 +418,7 @@ function EngagementDetail({
           <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Required Skills ({requiredSkills.length})</Label>
           {editing ? (
             <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto border rounded-md p-3">
-              {ALL_SKILLS.map((skill) => (
+              {CONSULTING_SKILLS.map((skill) => (
                 <Badge key={skill} variant={requiredSkills.includes(skill) ? 'default' : 'outline'} className="cursor-pointer transition-colors text-xs"
                   onClick={() => setRequiredSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill])}>
                   {requiredSkills.includes(skill) ? skill + ' x' : '+ ' + skill}
@@ -672,7 +661,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
   const [startDate, setStartDate] = useState(format(now, 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addWeeks(now, 8), 'yyyy-MM-dd'));
   const [status, setStatus] = useState<EngagementStatus>('upcoming');
-  const [color, setColor] = useState(COLOR_PALETTE[0]);
+  const [color, setColor] = useState<string>(ENGAGEMENT_COLOR_PALETTE[0]);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [isBet, setIsBet] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -690,7 +679,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
       setClientName(''); setProjectName('');
       setStartDate(format(now, 'yyyy-MM-dd'));
       setEndDate(format(addWeeks(now, 8), 'yyyy-MM-dd'));
-      setStatus('upcoming'); setColor(COLOR_PALETTE[0]);
+      setStatus('upcoming'); setColor(ENGAGEMENT_COLOR_PALETTE[0]);
       setRequiredSkills([]); setIsBet(false);
       onCreated(eng);
     } catch (e) { console.error('Failed to create engagement:', e); }
@@ -738,7 +727,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
             <div className="space-y-2">
               <Label className="text-xs">Color</Label>
               <div className="flex gap-1.5 flex-wrap pt-1">
-                {COLOR_PALETTE.map((c) => (
+                {ENGAGEMENT_COLOR_PALETTE.map((c) => (
                   <button key={c} className={`w-6 h-6 rounded-md border-2 transition-all ${color === c ? 'border-foreground scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} onClick={() => setColor(c)} />
                 ))}
               </div>
@@ -747,7 +736,7 @@ function NewEngagementDialog({ open, onOpenChange, onCreated, addEngagement }: {
           <div className="space-y-2">
             <Label className="text-xs">Required Skills</Label>
             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto border rounded-md p-3">
-              {ALL_SKILLS.map((skill) => (
+              {CONSULTING_SKILLS.map((skill) => (
                 <Badge key={skill} variant={requiredSkills.includes(skill) ? 'default' : 'outline'} className="cursor-pointer transition-colors text-xs"
                   onClick={() => setRequiredSkills((prev) => prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill])}>
                   {requiredSkills.includes(skill) ? skill + ' x' : '+ ' + skill}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authFetch } from '../api/auth-fetch';
+import { authFetchJson } from '../api/json-fetch';
 import type { Assignment } from '../types';
 
 interface AssignmentStore {
@@ -34,9 +34,13 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   fetchAssignments: async () => {
     set({ loading: true });
-    const res = await authFetch('/api/assignments');
-    const data = await res.json();
-    set({ assignments: data, loading: false });
+    try {
+      const data = await authFetchJson<Assignment[]>('/api/assignments');
+      set({ assignments: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   getByConsultant: (consultantId) =>
@@ -45,85 +49,47 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     get().assignments.filter((a) => a.engagement_id === engagementId),
 
   createAssignment: async (data) => {
-    try {
-      const res = await authFetch('/api/assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        set((s) => ({ assignments: [...s.assignments, created] }));
-        return created;
-      }
-    } catch {
-      // API unavailable — fall through to local-only creation
-    }
-    const local: Assignment = { ...data, id: crypto.randomUUID() };
-    set((s) => ({ assignments: [...s.assignments, local] }));
-    return local;
+    const created = await authFetchJson<Assignment>('/api/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    set((s) => ({ assignments: [...s.assignments, created] }));
+    return created;
   },
 
   updateAssignment: async (id, data) => {
-    try {
-      const res = await authFetch(`/api/assignments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        set((s) => ({
-          assignments: s.assignments.map((a) => (a.id === id ? updated : a)),
-        }));
-        return;
-      }
-    } catch {
-      // API unavailable — fall through to local-only update
-    }
+    const updated = await authFetchJson<Assignment>(`/api/assignments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
     set((s) => ({
-      assignments: s.assignments.map((a) => (a.id === id ? { ...a, ...data } as Assignment : a)),
+      assignments: s.assignments.map((a) => (a.id === id ? updated : a)),
     }));
   },
 
   removeAssignment: async (assignmentId) => {
-    try {
-      await authFetch(`/api/assignments/${assignmentId}`, { method: 'DELETE' });
-    } catch {
-      // API unavailable — still remove locally
-    }
+    await authFetchJson<{ success: boolean }>(`/api/assignments/${assignmentId}`, {
+      method: 'DELETE',
+    });
     set((s) => ({
       assignments: s.assignments.filter((a) => a.id !== assignmentId),
     }));
   },
 
   moveAssignment: async (assignmentId, newConsultantId, newStartDate, newEndDate) => {
-    try {
-      const res = await authFetch(`/api/assignments/${assignmentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consultant_id: newConsultantId,
-          start_date: newStartDate,
-          end_date: newEndDate,
-        }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        set((s) => ({
-          assignments: s.assignments.map((a) => a.id === assignmentId ? updated : a),
-        }));
-        return;
-      }
-    } catch {
-      // API unavailable — fall through to local-only update
-    }
+    const updated = await authFetchJson<Assignment>(`/api/assignments/${assignmentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        consultant_id: newConsultantId,
+        start_date: newStartDate,
+        end_date: newEndDate,
+      }),
+    });
     set((s) => ({
-      assignments: s.assignments.map((a) =>
-        a.id === assignmentId
-          ? { ...a, consultant_id: newConsultantId, start_date: newStartDate, end_date: newEndDate }
-          : a
-      ),
+      assignments: s.assignments.map((a) => (a.id === assignmentId ? updated : a)),
     }));
   },
 }));

@@ -14,33 +14,14 @@ import {
 } from '../src/generated/prisma/client';
 import { faker } from '@faker-js/faker';
 import { addWeeks, format, startOfWeek } from 'date-fns';
+import {
+  CONSULTING_SKILLS,
+  ENGAGEMENT_COLOR_PALETTE,
+} from '../src/lib/constants/staffing';
 
 const prisma = new PrismaClient();
 
 faker.seed(42);
-
-const CONSULTING_SKILLS = [
-  'Financial Modeling',
-  'Change Management',
-  'Data Analytics',
-  'Due Diligence',
-  'Process Optimization',
-  'Digital Strategy',
-  'Stakeholder Management',
-  'Market Analysis',
-  'Risk Assessment',
-  'Supply Chain',
-  'M&A Integration',
-  'Cost Reduction',
-  'Agile Transformation',
-  'Cloud Migration',
-  'People Analytics',
-  'Regulatory Compliance',
-  'Revenue Growth',
-  'Customer Experience',
-  'Organizational Design',
-  'Performance Management',
-];
 
 const PRACTICE_AREAS = ['strategy', 'operations', 'digital', 'risk', 'people'] as const;
 
@@ -61,11 +42,6 @@ const CLIENTS = [
   { name: 'Horizon Telecom', project: 'Cost Optimization Program' },
   { name: 'Sterling Insurance', project: 'Agile Transformation' },
   { name: 'Nova Pharmaceuticals', project: 'Market Entry Assessment' },
-];
-
-const CLIENT_COLORS = [
-  '#4F46E5', '#0891B2', '#059669', '#D97706',
-  '#DC2626', '#7C3AED', '#DB2777', '#2563EB',
 ];
 
 const OPPORTUNITY_PIPELINE = [
@@ -166,7 +142,6 @@ const OPPORTUNITY_PIPELINE = [
     ],
   },
 ];
-
 function seniorityToRole(seniority: string): string {
   switch (seniority) {
     case 'partner': return 'Partner';
@@ -269,7 +244,7 @@ async function main() {
         startDate: new Date(format(start, 'yyyy-MM-dd')),
         endDate: new Date(format(end, 'yyyy-MM-dd')),
         status: status as 'active' | 'upcoming' | 'completed' | 'at_risk',
-        color: CLIENT_COLORS[i % CLIENT_COLORS.length],
+        color: ENGAGEMENT_COLOR_PALETTE[i % ENGAGEMENT_COLOR_PALETTE.length],
         requiredSkills: {
           create: requiredSkills.map((skillName) => ({
             skillId: skillByName.get(skillName)!.id,
