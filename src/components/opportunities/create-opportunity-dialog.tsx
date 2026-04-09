@@ -50,6 +50,7 @@ import { formatAllocationAsManDays, getCurrentConsultantUtilization } from '@/li
 import { calculateBurnoutRisk } from '@/lib/utils/burnout';
 import { getStatusColor } from '@/lib/utils/colors';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { AvailableStaffingConsultantCard } from '@/components/staffing/shared/staffing-consultant-picker';
 
 interface DraftTentativeAssignment extends TentativeAssignmentInput {
@@ -94,6 +95,7 @@ export function CreateOpportunityDialog({
   onCreated,
   defaultStage,
 }: Props) {
+  const isManager = useAuthStore((s) => s.currentUser?.role === 'manager');
   const addOpportunity = useOpportunityStore((state) => state.addOpportunity);
   const updateOpportunity = useOpportunityStore((state) => state.updateOpportunity);
   const scenarios = useOpportunityStore((state) => state.scenarios);
@@ -266,19 +268,20 @@ export function CreateOpportunityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(94vh,980px)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:w-[min(96vw,1320px)] sm:max-w-[1320px]">
+      <DialogContent className={`h-[min(94vh,980px)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-0 ${isManager ? 'sm:w-[min(96vw,720px)] sm:max-w-[720px]' : 'sm:w-[min(96vw,1320px)] sm:max-w-[1320px]'}`}>
         <DialogHeader className="border-b px-6 py-5 pr-14 sm:px-8 sm:py-6">
           <DialogTitle>
             {isEditing ? 'Edit Opportunity' : 'New Opportunity'}
           </DialogTitle>
           <DialogDescription className="max-w-2xl">
-            Capture opportunity details and build the default staffing plan in one
-            place.
+            {isManager
+              ? 'Describe the opportunity details below.'
+              : 'Capture opportunity details and build the default staffing plan in one place.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
-          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.95fr)]">
+          <div className={`grid items-start gap-8 ${isManager ? '' : 'xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.95fr)]'}`}>
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -432,7 +435,7 @@ export function CreateOpportunityDialog({
               </div>
             </div>
 
-            <div className="space-y-5 rounded-2xl border bg-slate-50/40 p-5 sm:p-6">
+            {!isManager && <div className="space-y-5 rounded-2xl border bg-slate-50/40 p-5 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -746,7 +749,7 @@ export function CreateOpportunityDialog({
                   })}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         </div>
 

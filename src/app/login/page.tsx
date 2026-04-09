@@ -13,8 +13,9 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
 
   const handleLogin = (userIndex: number) => {
-    login(DEMO_USERS[userIndex]);
-    router.push('/timeline');
+    const user = DEMO_USERS[userIndex];
+    login(user);
+    router.push(user.role === 'manager' ? '/opportunities' : '/timeline');
   };
 
   return (

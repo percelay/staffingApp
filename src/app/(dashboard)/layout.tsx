@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { Separator } from '@/components/ui/separator';
@@ -14,15 +14,22 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const currentUser = useAuthStore((s) => s.currentUser);
 
   useEffect(() => {
     if (!currentUser) {
       router.replace('/login');
+      return;
     }
-  }, [currentUser, router]);
+    // Manager role can only access /opportunities
+    if (currentUser.role === 'manager' && !pathname.startsWith('/opportunities')) {
+      router.replace('/opportunities');
+    }
+  }, [currentUser, pathname, router]);
 
   if (!currentUser) return null;
+  if (currentUser.role === 'manager' && !pathname.startsWith('/opportunities')) return null;
 
   return (
     <StoreProvider key={currentUser.id}>

@@ -52,6 +52,7 @@ export function AppSidebar() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const [actualOpen, setActualOpen] = useState(true);
   const [potentialOpen, setPotentialOpen] = useState(true);
+  const isManager = currentUser?.role === 'manager';
 
   useEffect(() => {
     if (pathname.startsWith('/potential/staffing')) {
@@ -106,43 +107,16 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Top-level items */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {TOP_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    onClick={() => router.push(item.href)}
-                    className="gap-3"
-                  >
-                    <span className="text-base">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Actual group */}
-        <SidebarGroup>
-          <SidebarGroupLabel
-            className="cursor-pointer select-none"
-            onClick={() => setActualOpen(!actualOpen)}
-          >
-            <span className="text-[10px] mr-1.5 text-muted-foreground">{actualOpen ? '▾' : '▸'}</span>
-            Actual
-          </SidebarGroupLabel>
-          {actualOpen && (
+        {/* Top-level items (hidden for manager) */}
+        {!isManager && (
+          <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {ACTUAL_ITEMS.map((item) => (
-                  <SidebarMenuItem key={item.view}>
+                {TOP_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      isActive={activeView === item.view}
-                      onClick={() => handleNav(item)}
+                      isActive={pathname === item.href}
+                      onClick={() => router.push(item.href)}
                       className="gap-3"
                     >
                       <span className="text-base">{item.icon}</span>
@@ -152,10 +126,41 @@ export function AppSidebar() {
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
-          )}
-        </SidebarGroup>
+          </SidebarGroup>
+        )}
 
-        {/* Potential group */}
+        {/* Actual group (hidden for manager) */}
+        {!isManager && (
+          <SidebarGroup>
+            <SidebarGroupLabel
+              className="cursor-pointer select-none"
+              onClick={() => setActualOpen(!actualOpen)}
+            >
+              <span className="text-[10px] mr-1.5 text-muted-foreground">{actualOpen ? '▾' : '▸'}</span>
+              Actual
+            </SidebarGroupLabel>
+            {actualOpen && (
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {ACTUAL_ITEMS.map((item) => (
+                    <SidebarMenuItem key={item.view}>
+                      <SidebarMenuButton
+                        isActive={activeView === item.view}
+                        onClick={() => handleNav(item)}
+                        className="gap-3"
+                      >
+                        <span className="text-base">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            )}
+          </SidebarGroup>
+        )}
+
+        {/* Potential group — manager only sees Opportunities */}
         <SidebarGroup>
           <SidebarGroupLabel
             className="cursor-pointer select-none"
@@ -167,7 +172,10 @@ export function AppSidebar() {
           {potentialOpen && (
             <SidebarGroupContent>
               <SidebarMenu>
-                {POTENTIAL_ITEMS.map((item) => (
+                {(isManager
+                  ? POTENTIAL_ITEMS.filter((item) => item.view === 'opportunities')
+                  : POTENTIAL_ITEMS
+                ).map((item) => (
                   <SidebarMenuItem key={item.view}>
                     <SidebarMenuButton
                       isActive={activeView === item.view}
