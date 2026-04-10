@@ -22,25 +22,6 @@ export function normalizeDateInterval(
   return start <= end ? { start, end } : { start: end, end: start };
 }
 
-export function normalizeIsoDateRange(
-  startDate: string,
-  endDate: string
-): { startDate: string; endDate: string } | null {
-  const normalized = normalizeDateInterval(
-    parseISO(startDate),
-    parseISO(endDate)
-  );
-
-  if (!normalized) {
-    return null;
-  }
-
-  return {
-    startDate: format(normalized.start, 'yyyy-MM-dd'),
-    endDate: format(normalized.end, 'yyyy-MM-dd'),
-  };
-}
-
 export function getWeeksBetween(start: Date, end: Date): Date[] {
   const normalized = normalizeDateInterval(start, end);
   if (!normalized) {
@@ -80,10 +61,6 @@ export function getWeekCount(startDate: string, endDate: string): number {
   }
 
   return differenceInWeeks(normalized.end, normalized.start);
-}
-
-export function dateToISO(date: Date): string {
-  return format(date, 'yyyy-MM-dd');
 }
 
 export function formatIsoDate(

@@ -21,7 +21,7 @@ import {
 } from '@/lib/utils/date-helpers';
 import { cn } from '@/lib/utils';
 
-export interface StaffingWindow {
+interface StaffingWindow {
   projectName: string;
   startDate: string;
   endDate: string;
@@ -29,7 +29,7 @@ export interface StaffingWindow {
   excludeEngagementId?: string;
 }
 
-export interface StaffingProjectSummary {
+interface StaffingProjectSummary {
   id: string;
   client_name: string;
   project_name: string;
@@ -147,7 +147,7 @@ export function AvailableStaffingConsultantCard({
   );
 }
 
-export function MatchIndicator({
+function MatchIndicator({
   label,
   count,
   tone,
@@ -190,7 +190,7 @@ export function MatchIndicator({
   );
 }
 
-export function AvailabilityBar({
+function AvailabilityBar({
   consultantId,
   allAssignments,
   windowStart,

@@ -461,7 +461,7 @@ function buildOpportunitiesAndScenarios() {
   return { opportunities, scenarios };
 }
 
-export interface DemoSeedData {
+interface DemoSeedData {
   skills: string[];
   consultants: Consultant[];
   engagements: Engagement[];

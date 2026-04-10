@@ -8,13 +8,13 @@ type AllocationReference = {
   allocation_percentage: number;
 };
 
-export interface TeamSkillCoverage {
+interface TeamSkillCoverage {
   teamSkills: string[];
   coveredSkills: string[];
   missingSkills: string[];
 }
 
-export function normalizeStaffingSkillName(value: string) {
+function normalizeStaffingSkillName(value: string) {
   return value.trim().toLowerCase();
 }
 

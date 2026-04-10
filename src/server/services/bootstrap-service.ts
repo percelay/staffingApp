@@ -17,8 +17,6 @@ import {
   serializeWellbeingSignal,
 } from '@/server/serializers';
 
-export type { BootstrapSource } from '@/lib/contracts/bootstrap';
-
 export async function getBootstrapPayload(): Promise<BootstrapPayload> {
   try {
     const [

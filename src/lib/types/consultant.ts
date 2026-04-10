@@ -1,9 +1,6 @@
 export {
-  CONSULTANT_STATUS_VALUES,
   PRACTICE_AREA_VALUES,
-  SENIORITY_LEVEL_VALUES,
   type Consultant,
-  type ConsultantStatus,
   type PracticeArea,
   type SeniorityLevel,
 } from '@/lib/contracts/consultant';

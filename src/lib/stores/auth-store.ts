@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { PracticeArea } from '../types';
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   name: string;
   role: 'partner' | 'manager';

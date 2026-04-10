@@ -13,9 +13,9 @@
  *              or create/remove consultants.
  */
 
-export type Role = 'partner' | 'manager';
+type Role = 'partner' | 'manager';
 
-export interface AuthContext {
+interface AuthContext {
   user_id: string;
   role: Role;
 }
@@ -72,7 +72,7 @@ const METHOD_TO_ACTION: Record<string, Action> = {
 
 // ─── Auth Extraction ──────────────────────────────────────────────────────
 
-export function extractAuth(request: Request): AuthContext | null {
+function extractAuth(request: Request): AuthContext | null {
   const userId = request.headers.get('x-user-id');
   const role = request.headers.get('x-user-role') as Role | null;
 
@@ -85,7 +85,7 @@ export function extractAuth(request: Request): AuthContext | null {
 
 // ─── Permission Check ─────────────────────────────────────────────────────
 
-export function hasPermission(role: Role, resource: Resource, action: Action): boolean {
+function hasPermission(role: Role, resource: Resource, action: Action): boolean {
   return PERMISSIONS[role]?.[resource]?.includes(action) ?? false;
 }
 

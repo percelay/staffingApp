@@ -13,8 +13,6 @@ export const tentativeAssignmentInputSchema = z.object({
   allocation_percentage: z.number().int().min(0).max(100).default(100),
 });
 
-export const tentativeAssignmentCreateSchema = tentativeAssignmentInputSchema;
-
 export const tentativeAssignmentUpdateSchema = z
   .object({
     consultant_id: trimmedStringSchema.optional(),
@@ -46,7 +44,7 @@ export const scenarioUpdateSchema = z
 export type ScenarioCreateInput = z.infer<typeof scenarioCreateSchema>;
 export type ScenarioUpdateInput = z.infer<typeof scenarioUpdateSchema>;
 export type TentativeAssignmentCreateInput = z.infer<
-  typeof tentativeAssignmentCreateSchema
+  typeof tentativeAssignmentInputSchema
 >;
 export type TentativeAssignmentUpdateInput = z.infer<
   typeof tentativeAssignmentUpdateSchema
