@@ -6,7 +6,7 @@ import {
   normalizeDateInterval,
 } from './date-helpers';
 
-export interface AvailabilityGap {
+interface AvailabilityGap {
   weekStart: Date;
   allocation: number; // total allocation for that week (0-100+)
 }
@@ -41,17 +41,6 @@ export function getWeeklyAllocations(
   });
 }
 
-export function getAvailabilityGaps(
-  consultantId: string,
-  assignments: Assignment[],
-  start: Date,
-  end: Date
-): AvailabilityGap[] {
-  return getWeeklyAllocations(consultantId, assignments, start, end).filter(
-    (w) => w.allocation < 80
-  );
-}
-
 export function getAverageAvailability(
   consultantId: string,
   assignments: Assignment[],
@@ -65,14 +54,3 @@ export function getAverageAvailability(
   return Math.max(0, 100 - avgAllocation);
 }
 
-export function isAvailable(
-  consultantId: string,
-  startDate: string,
-  endDate: string,
-  assignments: Assignment[]
-): boolean {
-  const start = parseISO(startDate);
-  const end = parseISO(endDate);
-  const gaps = getAvailabilityGaps(consultantId, assignments, start, end);
-  return gaps.length > 0;
-}

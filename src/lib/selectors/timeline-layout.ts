@@ -12,7 +12,7 @@ export const TIMELINE_BLOCK_PADDING = 6;
 const BASE_BLOCK_HEIGHT =
   TIMELINE_BASE_LANE_HEIGHT - TIMELINE_BLOCK_PADDING * 2;
 
-export interface ConsultantTimelineGroup {
+interface ConsultantTimelineGroup {
   practiceArea: string;
   label: string;
   consultants: Consultant[];
@@ -25,17 +25,17 @@ export interface TimelineAssignmentLayout {
   yOffset: number;
 }
 
-export interface TimelineLaneLayout {
+interface TimelineLaneLayout {
   height: number;
   assignmentLayouts: Map<string, TimelineAssignmentLayout>;
 }
 
-export interface TimelineLaneDefinition {
+interface TimelineLaneDefinition {
   id: string;
   assignments: Assignment[];
 }
 
-export interface TimelineSectionDefinition<
+interface TimelineSectionDefinition<
   TLane extends TimelineLaneDefinition = TimelineLaneDefinition,
 > {
   lanes: TLane[];

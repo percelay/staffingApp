@@ -6,7 +6,7 @@ import {
 import type { Proposal, ProposalSlot } from '../types';
 import { getErrorMessage, type ResourceStatus } from './resource-state';
 
-export const DEFAULT_PROPOSAL_SLOTS: ProposalSlot[] = [
+const DEFAULT_PROPOSAL_SLOTS: ProposalSlot[] = [
   { role: 'lead', consultant_id: null, required: true },
   { role: 'manager', consultant_id: null, required: true },
   { role: 'consultant', consultant_id: null, required: true },

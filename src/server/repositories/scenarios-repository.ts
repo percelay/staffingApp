@@ -11,7 +11,7 @@ export async function listScenarios(opportunityId?: string) {
   });
 }
 
-export async function getScenarioById(id: string) {
+async function getScenarioById(id: string) {
   return prisma.scenario.findUnique({
     where: { id },
     include: scenarioInclude,
@@ -126,12 +126,6 @@ export async function createTentativeAssignment(data: {
       endDate: data.endDate,
       allocationPercentage: data.allocationPercentage,
     },
-  });
-}
-
-export async function getTentativeAssignmentById(id: string) {
-  return prisma.tentativeAssignment.findUnique({
-    where: { id },
   });
 }
 

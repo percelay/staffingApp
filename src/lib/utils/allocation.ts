@@ -60,7 +60,7 @@ export function getCurrentConsultantUtilization(
   }, 0);
 }
 
-export function getEngagementAllocationPercentage(
+function getEngagementAllocationPercentage(
   engagementId: string,
   assignments: Assignment[]
 ) {

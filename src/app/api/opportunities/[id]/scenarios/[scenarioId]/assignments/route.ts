@@ -5,7 +5,7 @@ import {
   createdResponse,
   parseRequestBody,
 } from '@/server/http';
-import { tentativeAssignmentCreateSchema } from '@/server/schemas/scenarios';
+import { tentativeAssignmentInputSchema } from '@/server/schemas/scenarios';
 import { createTentativeAssignmentFromInput } from '@/server/services/scenarios-service';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,7 @@ export const POST = withAuth(
     ) => {
     try {
       const { id, scenarioId } = await ctx.params;
-      const input = await parseRequestBody(request, tentativeAssignmentCreateSchema);
+      const input = await parseRequestBody(request, tentativeAssignmentInputSchema);
       const tentativeAssignment = await createTentativeAssignmentFromInput(
         id,
         scenarioId,

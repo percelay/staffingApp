@@ -1,9 +1,7 @@
 export {
-  PIPELINE_STAGE_VALUES,
   normalizePipelineStage,
   type Opportunity,
   type OpportunityCreateInput,
-  type OpportunityDefaultScenarioInput,
   type OpportunityUpdateInput,
   type PipelineStage,
   type Scenario,
@@ -20,15 +18,6 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   verbal_commit: 'Verbal Commit',
   won: 'Won',
   lost: 'Lost',
-};
-
-export const PIPELINE_STAGE_DOT_CLASSES: Record<PipelineStage, string> = {
-  identified: 'bg-slate-400',
-  qualifying: 'bg-blue-400',
-  proposal_sent: 'bg-amber-500',
-  verbal_commit: 'bg-emerald-500',
-  won: 'bg-green-600',
-  lost: 'bg-red-400',
 };
 
 export const PIPELINE_STAGE_BADGE_CLASSES: Record<PipelineStage, string> = {

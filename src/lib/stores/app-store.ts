@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { BootstrapSource } from '@/lib/contracts/bootstrap';
 
-export type BootstrapStatus = 'idle' | 'loading' | 'ready' | 'error';
+type BootstrapStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 interface AppStore {
   bootstrapStatus: BootstrapStatus;
